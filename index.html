@@ -1277,10 +1277,12 @@ function showSettings(){dockSide="left";
       <small class="seth">${tr("System follows your phone or computer.","ตามระบบ = เปลี่ยนตามมือถือหรือคอมพิวเตอร์")}</small></div>
     <div class="setrow"><div class="setl">${tr("Language","ภาษา")}</div>
       ${seg("lpick",[["en","English"],["th","ไทย"]],lang)}</div>
+    <div class="setrow" id="acctRow"><div class="setl">${tr("Account","บัญชี")}</div><small class="seth">…</small></div>
     <div class="setrow danger"><div class="setl">${tr("Start over","เริ่มใหม่")}</div>
       <small class="seth">${tr("Go back to Level 1. Your stars, streak and unlocked themes reset.","กลับไปเลเวล 1 ดาว สถิติชนะติดกัน และธีมที่ปลดล็อกจะถูกรีเซ็ต")}</small>
       <button class="big danger" id="resetBtn">↺ ${tr("Start over from Level 1","เริ่มใหม่ตั้งแต่เลเวล 1")}</button></div>
     <button class="big alt" id="menuBack">← ${tr("Menu","เมนู")}</button>`);
+  if(window.omtAccount)window.omtAccount($("acctRow"),tr);
   $("ovCard").querySelectorAll(".modepick button").forEach(b=>b.onclick=()=>{uiMode=b.dataset.v;store.set("uiMode",uiMode);applyMode();showSettings()});
   $("ovCard").querySelectorAll(".lpick button").forEach(b=>b.onclick=()=>{setLang(b.dataset.v);showSettings()});
   $("resetBtn").onclick=confirmReset;$("menuBack").onclick=showMenu}

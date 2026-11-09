@@ -8,8 +8,9 @@
 
   let sb = null, sessionP = null;
   const client = () => sb || (sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
-    auth: { persistSession: true, autoRefreshToken: true, storageKey: "omt_auth" }
+    auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true, flowType: "pkce", storageKey: "omt_auth" }
   }));
+  const backUrl = () => location.origin + location.pathname;
 
   function session() {
     if (!sessionP) sessionP = (async () => {
@@ -91,9 +92,52 @@
     doc: path => { const [c, id] = splitPath(path); return docRef(c, id); }
   };
 
+  /* ---------- Google login ----------
+     A guest (anonymous) player who signs in with Google keeps their progress: the Google account is
+     linked to the guest account. If that Google account already plays on another device, we switch to it
+     instead; the game then keeps whichever progress is further along. */
+  const google = () => client().auth.signInWithOAuth({ provider: "google", options: { redirectTo: backUrl() } });
+  async function signInGoogle() {
+    const s = await session().catch(() => null);
+    if (s && s.user && s.user.is_anonymous) {
+      const { error } = await client().auth.linkIdentity({ provider: "google", options: { redirectTo: backUrl() } });
+      if (!error) return;
+    }
+    await google();
+  }
+  // back from Google with "already linked to another player": switch to that player
+  (function () {
+    const q = new URLSearchParams(location.search + "&" + location.hash.slice(1));
+    if (q.get("error_code") === "identity_already_exists") {
+      history.replaceState(null, "", backUrl());
+      if (window.supabase) google();
+    }
+  })();
+
+  window.omtAccount = async function (row, tr) {
+    if (!row || !window.supabase) return;
+    const s = await session().catch(() => null);
+    const u = s && s.user;
+    const head = `<div class="setl">${tr("Account", "บัญชี")}</div>`;
+    if (!u) { row.innerHTML = head + `<small class="seth">${tr("Can't reach the save server right now.", "ตอนนี้เชื่อมต่อเซิร์ฟเวอร์บันทึกไม่ได้")}</small>`; return; }
+    if (u.is_anonymous) {
+      row.innerHTML = head + `<small class="seth">${tr("Playing as a guest: your save stays in this browser only. Sign in to keep it on any phone or computer.", "เล่นแบบผู้เยี่ยมชม: เซฟอยู่แค่ในเบราว์เซอร์นี้ ล็อกอินเพื่อเล่นต่อได้ทุกเครื่อง")}</small>
+        <button class="big" id="gIn">${tr("Sign in with Google", "ล็อกอินด้วย Google")}</button>`;
+      row.querySelector("#gIn").onclick = async e => {
+        e.target.disabled = true;
+        try { await signInGoogle(); } catch (err) { e.target.disabled = false; alert(tr("Couldn't open Google sign-in. Try again.", "เปิดหน้าล็อกอิน Google ไม่ได้ ลองอีกครั้ง")); }
+      };
+    } else {
+      const who = (u.email || (u.user_metadata && u.user_metadata.email) || "Google").replace(/[<>&"]/g, "");
+      row.innerHTML = head + `<small class="seth">${tr("Signed in as", "ล็อกอินเป็น")} ${who}. ${tr("Your save follows you to any device.", "เซฟจะตามไปทุกเครื่อง")}</small>
+        <button class="big alt" id="gOut">${tr("Sign out", "ออกจากระบบ")}</button>`;
+      row.querySelector("#gOut").onclick = async () => { await client().auth.signOut().catch(() => {}); location.reload(); };
+    }
+  };
+
   const user = {
     async id() { try { return (await session()).user.id; } catch (e) { console.warn("Off My Tiles: sign-in failed", e); return null; } },
-    async me() { return { name: "", email: "" }; },
+    async me() { try { const u = (await session()).user; return { name: "", email: u.is_anonymous ? "" : (u.email || "") }; } catch (e) { return { name: "", email: "" }; } },
     async isOwner() { return false; },
     async profiles() { return {}; }
   };
