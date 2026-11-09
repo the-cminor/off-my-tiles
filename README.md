@@ -16,3 +16,19 @@ Data lives in the Supabase project `off-my-tiles`, table `docs`:
 | `themes` | Theme Lab themes (ready for later) |
 
 Players sign in anonymously, so a save is tied to the browser they play in.
+
+## Versioning
+
+The game uses [Semantic Versioning](https://semver.org): `MAJOR.MINOR.PATCH`, e.g. `1.4.2`.
+
+- **MAJOR** (`2.0.0`): breaking change, such as old saves, themes or scores no longer fitting, or a big redesign
+- **MINOR** (`1.1.0`): new feature that doesn't break anything
+- **PATCH** (`1.0.1`): bug fix or small tweak
+
+Bumping one number resets the numbers to its right (`1.3.4` → `1.4.0`).
+
+To release:
+1. Add a new entry at the top of `CHANGELOG` in `index.html` with the new version, date and player-facing notes (EN + TH). The newest entry is the game's version: it shows in Settings and in What's new, and players see the red dot on **?** until they read it.
+2. Commit, then tag it: `git tag v1.1.0 && git push --tags`
+
+History: v2–v18 (the Claude artifact versions) are now `0.2.0`–`0.18.0`, and v19 (the game's own website) is `1.0.0`.

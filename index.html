@@ -1225,7 +1225,7 @@ function showHelp(){dockSide="left";const pc=pxE(P?P.animal:"🦊");
     <button class="big alt" id="menuBack">← ${tr("Menu","เมนู")}</button>`);
   $("ovCard").querySelectorAll(".langpick button").forEach(b=>b.onclick=()=>{setLang(b.dataset.l);showHelp()});
   $("okBtn").onclick=()=>{closeOv();startCoach()};$("menuBack").onclick=showMenu}
-function showMenu(){dockSide="left";const isNew=store.get("seenVer",0)<LATEST_VER;
+function showMenu(){dockSide="left";const isNew=isNewer(LATEST_VER,seenVer());
   const it=(id,ico,t,s)=>`<button class="mitem" id="${id}"><span class="mico">${ico}</span><span class="mtx"><b>${t}</b><small>${s}</small></span>${id==="mNews"&&isNew?'<i class="mdot" aria-label="new"></i>':""}<span class="mgo" aria-hidden="true">›</span></button>`;
   overlay(`<h2>${tr("Menu","เมนู")}</h2>
     <div class="mlist">
@@ -1248,6 +1248,7 @@ function showSettings(){dockSide="left";
     <div class="setrow danger"><div class="setl">${tr("Start over","เริ่มใหม่")}</div>
       <small class="seth">${tr("Go back to Level 1. Your stars, streak and unlocked themes reset.","กลับไปเลเวล 1 ดาว สถิติชนะติดกัน และธีมที่ปลดล็อกจะถูกรีเซ็ต")}</small>
       <button class="big danger" id="resetBtn">↺ ${tr("Start over from Level 1","เริ่มใหม่ตั้งแต่เลเวล 1")}</button></div>
+    <small class="seth appver">Off My Tiles! v${APP_VERSION}</small>
     <button class="big alt" id="menuBack">← ${tr("Menu","เมนู")}</button>`);
   if(window.omtAccount)window.omtAccount($("acctRow"),tr);
   $("ovCard").querySelectorAll(".modepick button").forEach(b=>b.onclick=()=>{uiMode=b.dataset.v;store.set("uiMode",uiMode);applyMode();showSettings()});
@@ -1334,71 +1335,82 @@ function showCoach(){const c=$("coach");if(coachStep&&level!==1)coachStep=0;if(!
 function coachTapped(){if(coachStep===1){board.querySelectorAll(".coachcell").forEach(e=>e.classList.remove("coachcell"));coachStep=2;showCoach()}}
 function coachPlaced(){if(!coachStep)return;coachStep=0;store.set("coached",true);$("coach").hidden=true;board.querySelectorAll(".coachcell").forEach(e=>e.classList.remove("coachcell"))}
 
-/* ---------- what's new: update notes, newest first. Add an entry at the top with a higher v for every update. ---------- */
+/* ---------- what's new: update notes, newest first.
+   Versions use Semantic Versioning, MAJOR.MINOR.PATCH (e.g. "1.4.2"). Add an entry at the top for every release:
+     MAJOR (2.0.0) = breaking change: old saves, themes or scores no longer fit, or a big redesign
+     MINOR (1.1.0) = new feature that doesn't break anything
+     PATCH (1.0.1) = bug fix or small tweak
+   Bumping one number resets the ones to its right (1.3.4 -> 1.4.0). Tag the commit too: git tag v1.4.0
+   History: v2..v18 (Claude artifact era) became 0.2.0..0.18.0, and v19 (own website) became 1.0.0. ---------- */
 const CHANGELOG=[
- {v:19,date:"2026-11-09",items:[
+ {v:"1.0.0",date:"2026-11-09",items:[
   ["🏠","Off My Tiles! has its own website now. No Claude account needed: just open the link and play.","Off My Tiles! มีเว็บของตัวเองแล้ว ไม่ต้องมีบัญชี Claude แค่เปิดลิงก์ก็เล่นได้เลย"],
   ["🔑","Sign in with Google in Settings to keep your save on any phone or computer.","ล็อกอินด้วย Google ในหน้าตั้งค่า เพื่อเล่นต่อได้ทุกเครื่อง"],
   ["📦","Played the old version? Sign in, then enter your transfer code in Settings to bring your level and stars over.","เคยเล่นเวอร์ชันเก่า? ล็อกอินแล้วใส่โค้ดย้ายคะแนนในหน้าตั้งค่า เพื่อย้ายเลเวลและดาวมา"],
   ["❤️","Refreshing the page keeps your board and hearts, so it no longer refills lost hearts.","รีเฟรชหน้าแล้วกระดานกับหัวใจยังอยู่เหมือนเดิม รีเฟรชไม่ได้หัวใจคืนแล้ว"],
   ["🛡️","Fair play: the server now rejects impossible scores, like skipping levels or a too-fast Daily time.","เล่นแฟร์: เซิร์ฟเวอร์ไม่รับคะแนนที่เป็นไปไม่ได้ เช่น ข้ามเลเวล หรือเวลา Daily ที่เร็วเกินจริง"],
   ["👆","Double-tapping no longer zooms the page on phones.","แตะสองครั้งบนมือถือ หน้าจอไม่ซูมแล้ว"]]},
- {v:18,date:"2026-11-09",items:[
+ {v:"0.18.0",date:"2026-11-09",items:[
   ["📖","The ? button opens a menu: How to play, Settings, What's new and Practice board.","ปุ่ม ? เปิดเมนู: วิธีเล่น ตั้งค่า มีอะไรใหม่ และทดลองเล่น"],
   ["⚙️","Settings: Day, Night or System look, language, and Start over (moved here from How to play).","ตั้งค่า: โหมดกลางวัน กลางคืน หรือตามระบบ ภาษา และเริ่มใหม่ (ย้ายมาจากหน้าวิธีเล่น)"],
   ["🔥","Leaderboard podium shows each player's win streak.","โพเดียมในตารางอันดับแสดงสถิติชนะติดกันของแต่ละคน"],
   ["🎨","Theme detail shows the theme's own colours, with the board colours in two rows. The theme in use shows its lives.","หน้ารายละเอียดธีมใช้สีของธีมนั้น สีกระดานเรียง 2 แถว และธีมที่ใช้อยู่แสดงหัวใจของธีม"],
   ["↔️","On wide screens menus open beside the board, on the side of their button.","จอกว้าง เมนูจะเปิดข้างกระดาน ฝั่งเดียวกับปุ่มที่กด"]]},
- {v:17,date:"2026-11-08",items:[
+ {v:"0.17.0",date:"2026-11-08",items:[
   ["🧩","The board now matches the pixel design: a dark tray with a bright frame, chunky bevelled tiles and pixel ✕ marks.","กระดานเป็นแบบพิกเซลแล้ว: ถาดสีเข้ม กรอบสว่าง ช่องนูนแบบเกมย้อนยุค และ ✕ แบบพิกเซล"]]},
- {v:16,date:"2026-11-08",items:[
+ {v:"0.16.0",date:"2026-11-08",items:[
   ["👾","Every icon in the game is now pixel art too: buttons, pop-ups, hints, leaderboards, the tutorial and these notes.","ไอคอนทุกตัวในเกมเป็นภาพพิกเซลแล้ว ทั้งปุ่ม ป๊อปอัป คำใบ้ ตารางอันดับ ระบบสอนเล่น และหน้านี้"]]},
- {v:15,date:"2026-11-08",items:[
+ {v:"0.15.0",date:"2026-11-08",items:[
   ["👾","New pixel look: every piece and heart is now 8-bit pixel art, with chunky retro buttons and fonts.","โฉมใหม่แบบพิกเซล: ตัวหมากและหัวใจทุกธีมเป็นภาพพิกเซล 8 บิต ปุ่มและฟอนต์สไตล์เกมย้อนยุค"],
   ["🪷","Loy Krathong has brand-new hand-drawn pieces and a moonlit blue background.","ธีมลอยกระทงมีหมากวาดใหม่ทั้งชุด และพื้นหลังสีฟ้าแสงจันทร์"],
   ["🎄","Christmas boards get a holly-green frame, and Animals a warm cream one.","กระดานธีมคริสต์มาสมีกรอบสีเขียวฮอลลี่ และธีมสัตว์มีกรอบสีครีมอุ่น"]]},
- {v:14,date:"2026-11-08",items:[
+ {v:"0.14.0",date:"2026-11-08",items:[
   ["🐐","G.O.A.T. board now ranks by ⭐ stars first, then level.","อันดับ G.O.A.T. เรียงตาม ⭐ ดาวก่อน แล้วค่อยดูเลเวล"],
   ["📅","Daily board: if two times tie, the player with fewer mistakes goes first.","อันดับรายวัน: ถ้าเวลาเท่ากัน คนที่ผิดน้อยกว่าขึ้นก่อน"]]},
- {v:13,date:"2026-11-08",items:[
+ {v:"0.13.0",date:"2026-11-08",items:[
   ["🎨","Theme list: the 👑 G.O.A.T. theme now sits right under this month's festival, and the festival card shows all 10 of its pieces.","หน้าธีม: ธีม 👑 G.O.A.T. ย้ายมาอยู่ใต้ธีมเทศกาล และการ์ดเทศกาลโชว์ตัวหมากครบทั้ง 10 ตัว"]]},
- {v:12,date:"2026-11-08",items:[
+ {v:"0.12.0",date:"2026-11-08",items:[
   ["👑","The G.O.A.T. theme now belongs to whoever is #1 right now. Get passed and it locks until you take back the top spot.","ธีม G.O.A.T. เป็นของคนที่อยู่อันดับ 1 ตอนนี้เท่านั้น ถ้าโดนแซง ธีมจะล็อกจนกว่าจะชิงอันดับ 1 คืนได้"]]},
- {v:11,date:"2026-11-08",items:[
+ {v:"0.11.0",date:"2026-11-08",items:[
   ["🐐","New champion theme: G.O.A.T.! Reach #1 on the G.O.A.T. leaderboard to unlock it: black-and-gold board, 🐐🥇🏅 pieces and ❤️‍🔥 hearts.","ธีมแชมป์ใหม่: G.O.A.T.! ขึ้นอันดับ 1 บนตาราง G.O.A.T. เพื่อปลดล็อก กระดานดำทอง ตัวหมาก 🐐🥇🏅 และหัวใจ ❤️‍🔥"]]},
- {v:10,date:"2026-11-08",items:[
+ {v:"0.10.0",date:"2026-11-08",items:[
   ["📅","Once you finish today's Daily puzzle, its banner above the board disappears until tomorrow. Today's ranking is still in the leaderboard (📅 Daily tab).","เมื่อเล่นเกมรายวันจบแล้ว แถบเกมรายวันด้านบนจะหายไปจนถึงพรุ่งนี้ ดูอันดับวันนี้ได้ที่ตารางอันดับ (แท็บ 📅 รายวัน)"]]},
- {v:8,date:"2026-11-08",items:[
+ {v:"0.8.0",date:"2026-11-08",items:[
   ["🎄","New Christmas colours: Santa red, holly green, star gold, snow white and more, still easy to tell apart for colour-blind players.","สีธีมคริสต์มาสใหม่: แดงซานต้า เขียวฮอลลี่ ทองดาว ขาวหิมะ และอีกหลายสี ยังแยกออกง่ายสำหรับคนตาบอดสี"]]},
- {v:7,date:"2026-11-07",items:[
+ {v:"0.7.0",date:"2026-11-07",items:[
   ["🎓","The 🎓 Tutorial button now opens a practice board in its own pop-up: try tap, double-tap and drag step by step, then solve a small puzzle. Your real game isn't touched.","ปุ่ม 🎓 สอนเล่น เปิดกระดานทดลองเล่นใน pop-up แยก ลองแตะ แตะ 2 ครั้ง และลากทีละขั้น แล้วลองแก้ด่านเล็กๆ โดยไม่กระทบเกมจริง"]]},
- {v:6,date:"2026-11-07",items:[
+ {v:"0.6.0",date:"2026-11-07",items:[
   ["🎓","New 🎓 Tutorial button under the board: the tutorial now glows on the exact square for both steps. It only starts by itself on your very first game.","ปุ่ม 🎓 สอนเล่น ใต้กระดาน: ช่องที่ต้องกดจะเรืองแสงทั้ง 2 ขั้น ระบบสอนจะขึ้นเองแค่ตอนเล่นครั้งแรก"]]},
- {v:5,date:"2026-11-07",items:[
+ {v:"0.5.0",date:"2026-11-07",items:[
   ["💡","Hints are now pictures: colour, row and column chips with arrows show why. The latest hint stays on screen, under the board or beside it on wide screens.","คำใบ้เป็นภาพ: ชิปสี แถว คอลัมน์ และลูกศรบอกเหตุผล คำใบ้ล่าสุดค้างไว้ใต้กระดาน หรือข้างกระดานบนจอกว้าง"],
   ["🎨","Tap any theme to see all its pieces, hearts and colours. Festivals sit in their own row at the top.","แตะธีมเพื่อดูตัวหมาก หัวใจ และสีทั้งหมด เทศกาลอยู่แถวบนสุด"],
   ["👆","Replay the tap tutorial any time from How to play. It also starts after Start over.","เปิดระบบสอนกดซ้ำได้จากหน้าวิธีเล่น และขึ้นเองหลังเริ่มใหม่"]]},
- {v:4,date:"2026-11-07",items:[
+ {v:"0.4.0",date:"2026-11-07",items:[
   ["📖","Picture guide: How to play now shows the 3 rules with tiny boards, plus the 3 taps.","วิธีเล่นแบบภาพ: กติกา 3 ข้อพร้อมกระดานตัวอย่าง และวิธีกด 3 แบบ"],
   ["👆","A coach on the board shows new players how to tap and double-tap.","ผู้ช่วยสอนบนกระดาน สอนผู้เล่นใหม่ให้แตะและแตะ 2 ครั้ง"],
   ["🆕","Update notes like this one, plus a red dot on ? when something is new.","แจ้งอัปเดตแบบนี้ และจุดแดงบนปุ่ม ? เมื่อมีของใหม่"]]},
- {v:3,date:"2026-11-07",items:[
+ {v:"0.3.0",date:"2026-11-07",items:[
   ["✨","New name: Off My Tiles!","ชื่อใหม่: Off My Tiles!"],
   ["🎨","Every theme has its own tile colours, background and board frame, checked to stay easy to tell apart.","ทุกธีมมีสีช่อง พื้นหลัง และกรอบกระดานของตัวเอง ตรวจแล้วว่าแยกสีได้ชัด"],
   ["📅","Daily puzzle: one timed 9×9 for everyone each day, with its own ranking.","เกมรายวัน: ด่าน 9×9 จับเวลา เดียวกันทุกคน พร้อมอันดับรายวัน"],
   ["🐐","The leaderboard is now the G.O.A.T. board, with a podium for the top 3.","ตารางอันดับใหม่ G.O.A.T. พร้อมแท่นรางวัล 3 อันดับแรก"],
   ["🧩","11×11 Master boards from level 200.","กระดาน 11×11 ระดับ Master ตั้งแต่เลเวล 200"],
   ["↺","Start over from Level 1 (in How to play).","เริ่มใหม่ตั้งแต่เลเวล 1 (ในหน้าวิธีเล่น)"]]},
- {v:2,date:"2026-11-07",items:[
+ {v:"0.2.0",date:"2026-11-07",items:[
   ["🎉","Festivals: New Year, Chinese New Year, Songkran, Spooky, Loy Krathong, Christmas. Beat a very hard puzzle to use the theme that month.","เทศกาล: ปีใหม่ ตรุษจีน สงกรานต์ สยองขวัญ ลอยกระทง คริสต์มาส ผ่านด่านยากมากเพื่อใช้ธีมตลอดเดือน"],
   ["🔓","Levels 10, 20, 30… are harder theme levels. Clear one to unlock a theme.","เลเวล 10, 20, 30… เป็นด่านปลดล็อกธีมที่ยากขึ้น ผ่านแล้วได้ธีมใหม่"],
   ["💖","Lives are hearts in each theme's colour. New themes: Sweets, Sports, Weather.","ชีวิตเป็นหัวใจสีตามธีม ธีมใหม่: ขนมหวาน กีฬา สภาพอากาศ"]]},
 ];
-const LATEST_VER=CHANGELOG[0].v;let pendingNews=false;
-function newsDot(){$("helpBtn").classList.toggle("dot",store.get("seenVer",0)<LATEST_VER)}
-function showNews(all){dockSide="left";const seen=store.get("seenVer",0),list=CHANGELOG.filter(e=>all||e.v>seen);
+const APP_VERSION=CHANGELOG[0].v,LATEST_VER=APP_VERSION;let pendingNews=false;
+/* old saves stored seenVer as a whole number (2..19): map it onto the semver history above */
+const toSemver=x=>typeof x==="number"?(x>=19?"1.0.0":x>0?"0."+x+".0":"0.0.0"):(typeof x==="string"&&/^\d+\.\d+\.\d+$/.test(x)?x:"0.0.0");
+const verCmp=(a,b)=>{const p=toSemver(a).split(".").map(Number),q=toSemver(b).split(".").map(Number);for(let i=0;i<3;i++)if(p[i]!==q[i])return p[i]-q[i];return 0};
+const isNewer=(a,b)=>verCmp(a,b)>0;
+const seenVer=()=>toSemver(store.get("seenVer",0));
+function newsDot(){$("helpBtn").classList.toggle("dot",isNewer(LATEST_VER,seenVer()))}
+function showNews(all){dockSide="left";const seen=seenVer(),list=CHANGELOG.filter(e=>all||isNewer(e.v,seen));
   overlay(`<div class="big-emoji">🆕</div><h2>${tr("What's new","มีอะไรใหม่")}</h2>
-    ${list.map(e=>`<div class="newsblk"><div class="newsdate">${e.date}</div><ul>${e.items.map(i=>`<li><span class="mi">${i[0]}</span><span>${lang==="th"?i[2]:i[1]}</span></li>`).join("")}</ul></div>`).join("")}
+    ${list.map(e=>`<div class="newsblk"><div class="newsdate">v${e.v} · ${e.date}</div><ul>${e.items.map(i=>`<li><span class="mi">${i[0]}</span><span>${lang==="th"?i[2]:i[1]}</span></li>`).join("")}</ul></div>`).join("")}
     <button class="big" id="newsOk">${tr("Got it","เข้าใจแล้ว")}</button>`);
   store.set("seenVer",LATEST_VER);newsDot();$("newsOk").onclick=closeOv}
 /* ---------- start over: back to level 1; removes your G.O.A.T. row; keeps language, name, festival and daily results ---------- */
@@ -1622,7 +1634,7 @@ document.querySelectorAll(".iconbtn,.tool .i:not(#placeIcon),.bulb").forEach(e=>
 startLevel();
 initCloud();
 if(!store.get("seenHelp",false)){store.set("seenHelp",true);store.set("seenVer",LATEST_VER);setTimeout(showHelp,300)}
-else if(store.get("seenVer",0)<LATEST_VER)setTimeout(()=>{if($("ov").hidden)showNews(false);else pendingNews=true},900);
+else if(isNewer(LATEST_VER,seenVer()))setTimeout(()=>{if($("ov").hidden)showNews(false);else pendingNews=true},900);
 newsDot();
 })();
 </script>
