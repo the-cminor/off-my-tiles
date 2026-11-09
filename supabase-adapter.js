@@ -121,7 +121,7 @@
     const head = `<div class="setl">${tr("Account", "บัญชี")}</div>`;
     if (!u) { row.innerHTML = head + `<small class="seth">${tr("Can't reach the save server right now.", "ตอนนี้เชื่อมต่อเซิร์ฟเวอร์บันทึกไม่ได้")}</small>`; return; }
     if (u.is_anonymous) {
-      row.innerHTML = head + `<small class="seth">${tr("Playing as a guest: your save stays in this browser only. Sign in to keep it on any phone or computer.", "เล่นแบบผู้เยี่ยมชม: เซฟอยู่แค่ในเบราว์เซอร์นี้ ล็อกอินเพื่อเล่นต่อได้ทุกเครื่อง")}</small>
+      row.innerHTML = head + `<small class="seth">${tr("Playing as a guest: your save stays in this browser only. Sign in to keep it on any phone or computer, or to use a transfer code from the old version.", "เล่นแบบผู้เยี่ยมชม: เซฟอยู่แค่ในเบราว์เซอร์นี้ ล็อกอินเพื่อเล่นต่อได้ทุกเครื่อง หรือเพื่อใช้โค้ดย้ายคะแนนจากเวอร์ชันเก่า")}</small>
         <button class="big" id="gIn">${tr("Sign in with Google", "ล็อกอินด้วย Google")}</button>`;
       row.querySelector("#gIn").onclick = async e => {
         e.target.disabled = true;
@@ -130,8 +130,29 @@
     } else {
       const who = (u.email || (u.user_metadata && u.user_metadata.email) || "Google").replace(/[<>&"]/g, "");
       row.innerHTML = head + `<small class="seth">${tr("Signed in as", "ล็อกอินเป็น")} ${who}. ${tr("Your save follows you to any device.", "เซฟจะตามไปทุกเครื่อง")}</small>
+        <div class="setl" style="margin-top:4px">${tr("Transfer code", "โค้ดย้ายคะแนน")}</div>
+        <small class="seth">${tr("Played the old Claude version? Enter the code Cin gave you to bring your level and stars here.", "เคยเล่นเวอร์ชันเก่าใน Claude? ใส่โค้ดที่ได้รับเพื่อย้ายเลเวลและดาวมาที่นี่")}</small>
+        <div class="nickrow" style="margin:0"><input id="tCode" maxlength="12" autocomplete="off" autocapitalize="characters" placeholder="XXXX-XXXX" style="text-transform:uppercase;user-select:text;-webkit-user-select:text"><button id="tGo">${tr("Move", "ย้าย")}</button></div>
+        <small class="seth" id="tMsg"></small>
         <button class="big alt" id="gOut">${tr("Sign out", "ออกจากระบบ")}</button>`;
       row.querySelector("#gOut").onclick = async () => { await client().auth.signOut().catch(() => {}); location.reload(); };
+      const msg = t => { row.querySelector("#tMsg").textContent = t; };
+      row.querySelector("#tGo").onclick = async e => {
+        const code = row.querySelector("#tCode").value.toUpperCase().replace(/[^A-Z0-9]/g, "");
+        if (code.length !== 8) { msg(tr("The code has 8 letters and numbers.", "โค้ดมี 8 ตัว (ตัวอักษรและตัวเลข)")); return; }
+        e.target.disabled = true; msg(tr("Moving…", "กำลังย้าย…"));
+        const { data, error } = await client().rpc("claim_legacy", { p_code: code });
+        if (error) {
+          e.target.disabled = false;
+          const m = String(error.message || "");
+          msg(m.includes("not found") ? tr("That code doesn't exist. Check it and try again.", "ไม่พบโค้ดนี้ ลองตรวจดูอีกครั้ง")
+            : m.includes("already used") ? tr("That code was already used by another account.", "โค้ดนี้ถูกใช้กับบัญชีอื่นไปแล้ว")
+            : tr("Couldn't move it. Try again.", "ย้ายไม่สำเร็จ ลองอีกครั้ง"));
+          return;
+        }
+        msg(tr(`Done! Level ${data.level} is yours. Reloading…`, `เรียบร้อย! ได้เลเวล ${data.level} คืนแล้ว กำลังโหลดใหม่…`));
+        setTimeout(() => location.reload(), 1200);
+      };
     }
   };
 
