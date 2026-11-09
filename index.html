@@ -14,16 +14,8 @@
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;800&family=Nunito:wght@600;800&family=Prompt:wght@500;700&family=Press+Start+2P&family=Pixelify+Sans:wght@400;600;700&family=Chakra+Petch:wght@600;700&display=swap">
-<style data-omt>
+<style>
 /* Layout: one-screen mobile game — header, animal progress strip, square board, tool row */
-.guard{position:fixed;inset:0;z-index:100;background:rgba(20,16,12,.72);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;overflow:auto}
-.guard .card{max-width:360px}
-.guard .gi{font-size:44px;line-height:1}
-.guard p{margin:8px 0}
-.guard code{font-size:12px;opacity:.7;word-break:break-all}
-.guard .big[disabled]{opacity:.45}
-.guard .gmsg{min-height:1em;font-size:13px}
-.gpill{position:fixed;left:calc(12px + env(safe-area-inset-left,0px));bottom:calc(12px + env(safe-area-inset-bottom,0px));z-index:99;border:0;border-radius:999px;padding:8px 14px;background:#d64545;color:#fff;font:800 14px var(--body);box-shadow:0 4px 12px rgba(0,0,0,.3);cursor:pointer}
 :root{
   --bg:#f6e3c4; --bg2:#efd3a8; --panel:#fffaf1; --ink:#5b3a21; --muted:#9a7552;
   --accent:#e8762b; --good:#3f9b5c; --bad:#d64545; --cellx:rgba(255,255,255,.92);
@@ -347,7 +339,6 @@ svg.pxe{width:1em;height:1em;display:inline-block;vertical-align:-.16em;shape-re
 .vx svg.pxe{width:26px;height:26px;display:block}
 .gest span svg.pxe,.gestures span svg.pxe{vertical-align:-.18em}
 .sheet .bulb svg.pxe{width:26px;height:26px;display:block}
-.gpill svg.pxe{vertical-align:-.2em}
 
 /* v17: board and tiles as in the Retro 8-bit design: dark tray, light frame, hard shadow, bevelled square tiles */
 :root{--tray:#0f1020;--frame:#94b0c2}
@@ -367,10 +358,9 @@ svg.pxe{width:1em;height:1em;display:inline-block;vertical-align:-.16em;shape-re
 /* popups: locked to the screen with a blurred margin around them; long content scrolls inside the card */
 .gest:empty{display:none}
 .overlay{overflow:hidden;justify-content:center;padding:max(28px,calc(env(safe-area-inset-top,0px) + 14px)) 22px max(28px,calc(env(safe-area-inset-bottom,0px) + 14px))}
-.overlay>.card,.guard>.card{margin:0;flex-shrink:1;min-height:0;box-sizing:border-box;width:100%;
+.overlay>.card{margin:0;flex-shrink:1;min-height:0;box-sizing:border-box;width:100%;
   max-width:min(360px,calc((100vw - 44px)/var(--cz,1)));max-height:calc((100% - 0px)/var(--cz,1));
   overflow-x:hidden;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch}
-.guard{overflow:hidden}
 .overlay .themes{max-height:none;overflow:visible}
 .overlay .theme{min-width:0}
 .theme.crown .tn{white-space:nowrap}
@@ -533,15 +523,11 @@ html,body{overscroll-behavior:none}
 </div></div>
 
 <div class="overlay" id="ov" hidden><div class="card" id="ovCard"></div></div>
-<div class="guard" id="guard" hidden><div class="card" id="guardCard"></div></div>
-<button class="gpill" id="guardPill" hidden>⚠️ <span>Review</span></button>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.0/dist/umd/supabase.js"></script>
 <script src="supabase-adapter.js"></script>
-<script data-omt>
+<script>
 (()=>{
-/* ---------- version guard: a version someone else published waits for the owner's OK ---------- */
-const GUARD_SRC=[...document.querySelectorAll("[data-omt]")].map(e=>e.textContent).join("\u0001");
 /* ---------- theme colours ----------
    11 tile colours per theme, built offline by palette.js: chosen inside each theme's mood (lightness, saturation, mood hues)
    and checked automatically: every pair differs by ≥ 12 ΔE (OKLab×100) for normal vision and ≥ 6 for red/green colour-blind
@@ -734,51 +720,15 @@ let cloud=null,cloudTimer=null,cloudBusy=false,cloudDirty=false;
 let userNS=null,myId=null,boardCol=null,boardRows=[],boardDenied=false,boardOpen=false,boardReady=false;
 let nick=store.get("nick",""),best=store.get("best",streak),saveDenied=false,noSaveShown=false;
 function saveCloud(){if(!cloud)return;clearTimeout(cloudTimer);cloudTimer=setTimeout(flushCloud,800)}
-async function flushCloud(){if(!cloud||guardLocked)return;if(cloudBusy){cloudDirty=true;return}cloudBusy=true;
+async function flushCloud(){if(!cloud)return;if(cloudBusy){cloudDirty=true;return}cloudBusy=true;
   try{await cloud.set({level,hX,hA,streak,score,theme:themeId,nick,best,lang,festWon,run:store.get("run",null),savedAt:Date.now()});if(saveDenied){saveDenied=false;renderStack()}}
   catch(e){if(!saveDenied){saveDenied=true;renderStack();markNoSave()}}
   if(boardCol&&myId){try{if(level>1||score>0)await boardCol.doc(myId).set({name:nick,level,stars:score,best,streak,updatedAt:Date.now()});boardDenied=false}
     catch(e){boardDenied=true}if(boardOpen)renderBoard()}
   cloudBusy=false;if(cloudDirty){cloudDirty=false;flushCloud()}}
-async function buildHash(){try{const b=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(GUARD_SRC));return[...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,"0")).join("")}catch(e){return null}}
-let guardLocked=false;
-const within=(p,ms=8000)=>Promise.race([p,new Promise((_,r)=>setTimeout(()=>r("timeout"),ms))]);
-function guardCard(html){const g=$("guard");g.hidden=false;$("guardPill").hidden=true;$("guardCard").innerHTML=emo(html);return g}
-async function checkGuard(db,user){if(!db)return;const h=await buildHash();if(!h)return;let snap;
-  try{snap=await within(db.doc("guard/approved").get())}catch(e){return}
-  if(!snap.exists)return; // guard not set up: never lock
-  const A=snap.data()||{},list=Array.isArray(A.hashes)?A.hashes:[];
-  if(list.includes(h)){if(window.__omtFallback)showFallbackNote();return}
-  let owner=false;try{owner=user?await user.isOwner():false}catch(e){}
-  let build=null;try{const b=await within(db.doc("guard/build").get());const d=b.exists?b.data():null;if(d&&typeof d.html==="string"&&list.includes(d.hash))build=d}catch(e){}
-  if(!owner){guardLocked=true;clearTimeout(cloudTimer);
-    /* friends get the last approved version instead of the unapproved one */
-    if(build&&!window.__omtFallback){try{if(document.readyState==="loading")await new Promise(r=>document.addEventListener("DOMContentLoaded",r,{once:true}));window.__omtFallback={pending:h};try{clearInterval(dailyTick);clearTimeout(cloudTimer)}catch(e){}document.open();document.write(build.html);document.close();return}catch(e){}}
-    guardCard(`<div class="gi">🔒</div><h2>${tr("This version is waiting for approval","เวอร์ชันนี้รอการอนุมัติ")}</h2>
-      <p>${tr("Someone changed the game. The owner needs to approve it before anyone can play. Your progress is safe.","มีคนแก้ไขเกม ต้องรอเจ้าของเกมอนุมัติก่อนถึงจะเล่นได้ ความคืบหน้าของคุณยังอยู่ครบ")}</p>`);return}
-  ownerReview(db,h,A,list,build)}
-function showFallbackNote(){const g=guardCard(`<div class="gi">⚠️</div><h2>${tr("Someone changed the game","มีคนแก้ไขเกม")}</h2>
-    <p>${tr("That version is waiting for the owner's approval. You're playing the last approved version, and your progress saves as usual.","เวอร์ชันนั้นรอเจ้าของเกมอนุมัติอยู่ ตอนนี้คุณกำลังเล่นเวอร์ชันล่าสุดที่อนุมัติแล้ว ความคืบหน้าบันทึกตามปกติ")}</p>
-    <button class="big" id="gPlay">${tr("Keep playing","เล่นต่อ")}</button>`);$("gPlay").onclick=()=>{g.hidden=true}}
-function ownerReview(db,h,A,list,build){const g=guardCard(`<div class="gi">⚠️</div><h2>${tr("Someone else changed the game","มีคนอื่นแก้ไขเกม")}</h2>
-    <p>${tr("You're looking at the new version. Until you decide, everyone else plays the last version you approved.","คุณกำลังดูเวอร์ชันใหม่นี้อยู่ ระหว่างรอคุณตัดสินใจ คนอื่นจะได้เล่นเวอร์ชันล่าสุดที่คุณอนุมัติไว้")}</p>
-    <button class="big" id="gOk">✅ ${tr("Approve this version","อนุมัติเวอร์ชันนี้")}</button>
-    <button class="big alt" id="gTry">👀 ${tr("Try it first","ลองเล่นดูก่อน")}</button>
-    <button class="big alt" id="gNo"${build?"":" disabled"}>↩️ ${tr("Don't approve: bring back the approved version","ไม่อนุมัติ: คืนเวอร์ชันที่อนุมัติไว้")}</button>
-    <p class="gmsg" id="gMsg"></p><p><code>${h.slice(0,12)}</code></p>`);
-  const msg=t=>{$("gMsg").textContent=t};
-  $("gTry").onclick=()=>{g.hidden=true;const pl=$("guardPill");pl.innerHTML=emo("⚠️ "+tr("Approve or undo","อนุมัติ / ไม่อนุมัติ"));pl.hidden=false};
-  $("guardPill").onclick=()=>ownerReview(db,h,A,list,build);
-  $("gOk").onclick=async()=>{$("gOk").disabled=true;try{await db.doc("guard/approved").update({hashes:[...list.slice(-40),h],updatedAt:Date.now()});g.hidden=true;$("guardPill").hidden=true}
-    catch(e){$("gOk").disabled=false;msg(tr("Couldn't save. Try again.","บันทึกไม่สำเร็จ ลองอีกครั้ง"))}};
-  $("gNo").onclick=async()=>{if(!build)return;$("gNo").disabled=true;msg(tr("Restoring…","กำลังคืนเวอร์ชัน…"));
-    try{const rej=Array.isArray(A.rejected)?A.rejected:[];await db.doc("guard/approved").update({rejected:[...rej.slice(-40),h]}).catch(()=>{});
-      const art=window.claude&&await window.claude.use("artifact");if(!art)throw{code:"unavailable"};await art.publish(build.html);msg(tr("Done. Reloading…","เรียบร้อย กำลังโหลดใหม่…"))}
-    catch(e){if(e&&e.code==="conflict"){msg(tr("Someone published again. Reloading…","มีคนอัปเดตอีกรอบ กำลังโหลดใหม่…"));return}
-      $("gNo").disabled=false;msg(tr("Couldn't restore here. Tell Claude in your chat: “roll the game back”.","คืนเวอร์ชันจากตรงนี้ไม่ได้ บอก Claude ในแชทของคุณว่า “ย้อนเกมกลับ”"))}}}
 async function initCloud(){try{
   const use=window.claude&&window.claude.use;if(!use){markGuest();return}
-  const[db,user]=await Promise.all([use("db"),use("user")]);checkGuard(db,user);
+  const[db,user]=await Promise.all([use("db"),use("user")]);
   const id=user?await user.id():null;if(!id){markGuest();return}
   try{const me=await user.me();myEmail=me&&me.email||"";myName=me&&me.name||""}catch(e){}
   if(!db){markNoSave();return}
@@ -1076,31 +1026,22 @@ function markGuest(){if(store.get("guestWarned",false))return;store.set("guestWa
 function markNoSave(){if(noSaveShown)return;noSaveShown=true;saveDenied=true;try{renderStack()}catch(e){}
   setTimeout(()=>{if(!$("ov").hidden)pendingNoSave=true;else showNoSave()},700)}
 let pendingNoSave=false,myEmail="",myName="";
-function requestText(){return tr(`Hi! Can you add me to Off My Tiles! as an Editor so my score saves and I can join the leaderboard?\nMy Claude email: ${myEmail||"(type your email here)"}`,
-  `สวัสดี! ช่วยเพิ่มฉันเข้าเกม Off My Tiles! เป็น Editor ได้ไหม จะได้เซฟคะแนนและขึ้น leaderboard ได้\nอีเมล Claude ของฉัน: ${myEmail||"(พิมพ์อีเมลของคุณตรงนี้)"}`)}
-async function copyRequest(){const ta=$("reqText");const txt=ta.value;
-  try{await navigator.clipboard.writeText(txt);$("reqCopy").textContent=tr("Copied ✓ Now send it","คัดลอกแล้ว ✓ ส่งได้เลย")}
-  catch(e){ta.focus();ta.select();$("reqCopy").textContent=tr("Selected. Copy it from the box","เลือกข้อความแล้ว คัดลอกจากกล่องได้เลย")}}
 function showNoSave(){
-  overlay(`<div class="big-emoji">🔒</div><h2>${tr("Ask for access","ขอสิทธิ์เข้าเล่น")}</h2>
-    <p>${tr(`You're signed in${myName?` as <b class="nm-me"></b>`:""}, but you only have <b>view</b> access. Your progress won't be saved and you can't join the 🏆 leaderboard.`,
-      `คุณล็อกอินอยู่${myName?`ในชื่อ <b class="nm-me"></b> `:""}แต่มีสิทธิ์แค่<b>ดู</b> ความคืบหน้าจะไม่ถูกบันทึก และขึ้น 🏆 leaderboard ไม่ได้`)}</p>
-    <ol class="rules">${tr(`<li>Tap <b>Copy request</b>.</li><li>Send it to the person who shared this game.</li><li>When they invite you, open the invite link they send you, signed in with the same email.</li>`,
-      `<li>กด <b>คัดลอกคำขอ</b></li><li>ส่งให้คนที่แชร์เกมนี้</li><li>เมื่อเขาเชิญแล้ว ให้เปิดลิงก์เชิญที่เขาส่งมา โดยล็อกอินด้วยอีเมลเดียวกัน</li>`)}</ol>
-    <textarea id="reqText" class="req" rows="4" aria-label="Access request message"></textarea>
-    <button class="big" id="reqCopy">${tr("Copy request","คัดลอกคำขอ")}</button>
-    <button class="big alt" id="noSaveOk">${tr("Play anyway","เล่นต่อเลย")}</button>`);
-  const nm=$("ovCard").querySelector(".nm-me");if(nm)nm.textContent=myName;
-  $("reqText").value=requestText();$("reqCopy").onclick=copyRequest;$("noSaveOk").onclick=closeOv}
+  overlay(`<div class="big-emoji">💾</div><h2>${tr("Couldn't save","บันทึกไม่สำเร็จ")}</h2>
+    <p>${tr("Your last result couldn't be saved to your account, so it's kept only in this browser for now. Your earlier saves are safe.","บันทึกผลล่าสุดเข้าบัญชีไม่ได้ ตอนนี้เก็บไว้แค่ในเบราว์เซอร์นี้ เซฟก่อนหน้ายังอยู่ครบ")}</p>
+    <p>${tr("Check your internet and reload. If it keeps happening, tell Cin.","ลองเช็กอินเทอร์เน็ตแล้วโหลดใหม่ ถ้ายังเป็นอยู่ บอก Cin ได้เลย")}</p>
+    <a class="big" href="">${tr("Reload","โหลดใหม่")}</a>
+    <button class="big alt" id="noSaveOk">${tr("Keep playing","เล่นต่อ")}</button>`);
+  $("noSaveOk").onclick=closeOv}
 function showGuest(){
   overlay(`<div class="big-emoji">💾</div><h2>${tr("Playing as a guest","กำลังเล่นแบบผู้เยี่ยมชม")}</h2>
     <p>${tr("Couldn't reach the save server, so your level, ⭐ stars and hints are saved only in this browser for now.","เชื่อมต่อเซิร์ฟเวอร์บันทึกไม่ได้ เลเวล ⭐ ดาว และคำใบ้จะถูกบันทึกไว้แค่ในเบราว์เซอร์นี้ก่อน")}</p>
     <ul class="rules">${tr(`<li>Clearing your browser data, using private mode or switching devices will <b>lose your record</b>.</li>
     <li>You won't appear on the 🏆 leaderboard.</li>
-    <li>After signing in, ask the person who shared the game to invite your email as <b>Editor</b>. The game will help you send the request.</li>`,
+    <li>Reload when you're back online and your progress will save to your account again.</li>`,
     `<li>ถ้าล้างข้อมูลเบราว์เซอร์ ใช้โหมดส่วนตัว หรือเปลี่ยนเครื่อง <b>สถิติจะหายหมด</b></li>
     <li>ชื่อคุณจะไม่ขึ้นใน 🏆 leaderboard</li>
-    <li>หลังล็อกอินแล้ว ให้ขอคนที่แชร์เกมเชิญอีเมลคุณเป็น <b>Editor</b> เกมจะช่วยสร้างข้อความขอสิทธิ์ให้</li>`)}</ul>
+    <li>เมื่อกลับมาออนไลน์ ให้โหลดใหม่ ความคืบหน้าจะบันทึกเข้าบัญชีอีกครั้ง</li>`)}</ul>
     <a class="big" href="">${tr("Try again","ลองอีกครั้ง")}</a>
     <button class="big alt" id="guestOk">${tr("Play as guest","เล่นแบบผู้เยี่ยมชม")}</button>`);
   $("guestOk").onclick=closeOv}
@@ -1143,7 +1084,7 @@ function lbClock(){clearTimeout(lbClockT);const el=$("lbClock");if(!el||$("ov").
   const hms=[Math.floor(s/3600),Math.floor(s%3600/60),s%60].map(x=>String(x).padStart(2,"0")).join(":");
   const day=d.toLocaleDateString(lang==="th"?"th-TH":"en-GB",{weekday:"short",day:"numeric",month:"short",timeZone:"UTC"});
   el.textContent=tr(`${day} · new puzzle in ${hms}`,`${day} · ด่านใหม่ใน ${hms}`);lbClockT=setTimeout(lbClock,1000)}
-/* square pixel avatar: the Claude profile picture if there is one, else the name's first letter on a colour */
+/* square pixel avatar: a profile picture if there is one, else the name's first letter on a colour */
 const AV_COLS=["#41a6f6","#ffcd75","#38b764","#ef7d57","#b13e53","#73eff7","#a7f070","#bc72c2","#94b0c2"];
 function avSq(r,pr,name,cls){const el=document.createElement("span");el.className="lbav "+(cls||"");
   if(pr&&pr.avatarUrl){const im=document.createElement("img");im.alt="";im.src=pr.avatarUrl;el.appendChild(im)}
@@ -1153,7 +1094,7 @@ function avSq(r,pr,name,cls){const el=document.createElement("span");el.classNam
 const dailyCmp=(a,b)=>a.ms-b.ms||(a.mistakes||0)-(b.mistakes||0)||(a.at||0)-(b.at||0);
 const goatCmp=(a,b)=>(b.stars||0)-(a.stars||0)||(b.level||0)-(a.level||0)||(a.updatedAt||0)-(b.updatedAt||0);
 const goatRows=()=>boardRows.filter(r=>(r.level||1)>1||(r.stars||0)>0).sort(goatCmp);
-function checkGoat(){if(!myId||guardLocked)return;const top=goatRows()[0],now=!!top&&top.id===myId;if(now===goatNow)return;
+function checkGoat(){if(!myId)return;const top=goatRows()[0],now=!!top&&top.id===myId;if(now===goatNow)return;
   const using=themeId==="goat";goatNow=now;store.set("goatNow",now);if(mode!=="fest")applyTheme();
   const kind=now?"won":using?"lost":null;if(!kind)return;
   if($("ov").hidden&&!busy)showGoatNote(kind);else pendingGoat=kind}
@@ -1204,7 +1145,7 @@ async function renderBoard(){const list=$("lbList"),note=$("boardNote"),pod=$("p
   else rows.forEach((r,j)=>{const row=mk("div","lbrow"+(r.id===myId?" me":""));const m=r.mistakes||0;
       row.append(mk("span","lbrk",String(j+1)),avSq(r,profs[r.id],nameOf(r)),mk("b","lbnm",nameOf(r)+you(r)),mk("span","lbmiss",tr(`${m} miss`,`ผิด ${m}`)),mk("span","lbtime",fmtTime(r.ms)));list.appendChild(row)});
   if(boardNoteLock)return;
-  if((g&&boardDenied)||(!g&&dailyDenied))note.textContent=tr("You can see the board, but your score can't be added yet. Ask the game's owner to invite you from the Share menu with edit access.","คุณดูอันดับได้ แต่ยังเพิ่มคะแนนไม่ได้ ขอให้เจ้าของเกมเชิญคุณเป็น Editor จากเมนู Share");
+  if((g&&boardDenied)||(!g&&dailyDenied))note.textContent=tr("Your latest score couldn't be added to the ranking. It's still saved on this device. Check your internet and reload.","เพิ่มคะแนนล่าสุดเข้าอันดับไม่ได้ แต่ยังบันทึกไว้ในเครื่องนี้ ลองเช็กอินเทอร์เน็ตแล้วโหลดใหม่");
   else if(!rows.length)note.textContent=g?tr("No legends yet. Clear a level to claim the throne.","ยังไม่มีตำนาน ผ่านสักเลเวลเพื่อขึ้นบัลลังก์"):tr("Nobody has finished today's puzzle yet. Be the first!","ยังไม่มีใครผ่านด่านวันนี้ มาเป็นคนแรกกัน!");
   else note.innerHTML=emo(g?tr("Ranked by ⭐ stars, then level.","เรียงตาม ⭐ ดาว แล้วตามเลเวล"):tr("Same 9×9 puzzle for everyone. Each mistake adds 30 seconds; ties go to fewer mistakes.","ด่าน 9×9 เดียวกันทุกคน วางผิดบวก 30 วินาที ถ้าเวลาเท่ากัน คนที่ผิดน้อยกว่าขึ้นก่อน"))}
 let boardNoteLock=false;
@@ -1395,6 +1336,13 @@ function coachPlaced(){if(!coachStep)return;coachStep=0;store.set("coached",true
 
 /* ---------- what's new: update notes, newest first. Add an entry at the top with a higher v for every update. ---------- */
 const CHANGELOG=[
+ {v:19,date:"2026-11-09",items:[
+  ["🏠","Off My Tiles! has its own website now. No Claude account needed: just open the link and play.","Off My Tiles! มีเว็บของตัวเองแล้ว ไม่ต้องมีบัญชี Claude แค่เปิดลิงก์ก็เล่นได้เลย"],
+  ["🔑","Sign in with Google in Settings to keep your save on any phone or computer.","ล็อกอินด้วย Google ในหน้าตั้งค่า เพื่อเล่นต่อได้ทุกเครื่อง"],
+  ["📦","Played the old version? Sign in, then enter your transfer code in Settings to bring your level and stars over.","เคยเล่นเวอร์ชันเก่า? ล็อกอินแล้วใส่โค้ดย้ายคะแนนในหน้าตั้งค่า เพื่อย้ายเลเวลและดาวมา"],
+  ["❤️","Refreshing the page keeps your board and hearts, so it no longer refills lost hearts.","รีเฟรชหน้าแล้วกระดานกับหัวใจยังอยู่เหมือนเดิม รีเฟรชไม่ได้หัวใจคืนแล้ว"],
+  ["🛡️","Fair play: the server now rejects impossible scores, like skipping levels or a too-fast Daily time.","เล่นแฟร์: เซิร์ฟเวอร์ไม่รับคะแนนที่เป็นไปไม่ได้ เช่น ข้ามเลเวล หรือเวลา Daily ที่เร็วเกินจริง"],
+  ["👆","Double-tapping no longer zooms the page on phones.","แตะสองครั้งบนมือถือ หน้าจอไม่ซูมแล้ว"]]},
  {v:18,date:"2026-11-09",items:[
   ["📖","The ? button opens a menu: How to play, Settings, What's new and Practice board.","ปุ่ม ? เปิดเมนู: วิธีเล่น ตั้งค่า มีอะไรใหม่ และทดลองเล่น"],
   ["⚙️","Settings: Day, Night or System look, language, and Start over (moved here from How to play).","ตั้งค่า: โหมดกลางวัน กลางคืน หรือตามระบบ ภาษา และเริ่มใหม่ (ย้ายมาจากหน้าวิธีเล่น)"],
@@ -1420,8 +1368,6 @@ const CHANGELOG=[
   ["🐐","New champion theme: G.O.A.T.! Reach #1 on the G.O.A.T. leaderboard to unlock it: black-and-gold board, 🐐🥇🏅 pieces and ❤️‍🔥 hearts.","ธีมแชมป์ใหม่: G.O.A.T.! ขึ้นอันดับ 1 บนตาราง G.O.A.T. เพื่อปลดล็อก กระดานดำทอง ตัวหมาก 🐐🥇🏅 และหัวใจ ❤️‍🔥"]]},
  {v:10,date:"2026-11-08",items:[
   ["📅","Once you finish today's Daily puzzle, its banner above the board disappears until tomorrow. Today's ranking is still in the leaderboard (📅 Daily tab).","เมื่อเล่นเกมรายวันจบแล้ว แถบเกมรายวันด้านบนจะหายไปจนถึงพรุ่งนี้ ดูอันดับวันนี้ได้ที่ตารางอันดับ (แท็บ 📅 รายวัน)"]]},
- {v:9,date:"2026-11-08",items:[
-  ["🔒","Game safety: if anyone other than the owner changes the game, you keep playing the last approved version until the owner approves the change. Your progress is never touched.","ความปลอดภัยของเกม: ถ้ามีคนอื่นนอกจากเจ้าของแก้เกม คุณจะได้เล่นเวอร์ชันล่าสุดที่อนุมัติแล้วไปก่อน จนกว่าเจ้าของจะอนุมัติ ความคืบหน้าของคุณไม่ถูกแตะต้อง"]]},
  {v:8,date:"2026-11-08",items:[
   ["🎄","New Christmas colours: Santa red, holly green, star gold, snow white and more, still easy to tell apart for colour-blind players.","สีธีมคริสต์มาสใหม่: แดงซานต้า เขียวฮอลลี่ ทองดาว ขาวหิมะ และอีกหลายสี ยังแยกออกง่ายสำหรับคนตาบอดสี"]]},
  {v:7,date:"2026-11-07",items:[
@@ -1598,7 +1544,7 @@ async function dailyWin(){pauseDaily();daily.done=true;daily.final=daily.ms+dail
   overlay(`<div class="big-emoji">📅🎉</div><h2>${tr("Daily complete!","ผ่านเกมรายวัน!")}</h2>
     <div class="gain" style="font-size:34px">⏱ ${fmtTime(daily.final)}</div>
     <p>${daily.mistakes?tr(`Includes +${daily.mistakes*30}s for ${daily.mistakes} mistake${daily.mistakes>1?"s":""}.`,`รวมเวลาปรับ +${daily.mistakes*30} วิ จากการวางผิด ${daily.mistakes} ครั้ง`):tr("No mistakes. Clean run!","ไม่ผิดเลย สุดยอด!")}
-    ${rk?`<br><b>${tr(`#${rk} today`,`อันดับ ${rk} ของวันนี้`)}</b>`:dailyDenied?`<br>${tr("Your time is saved on this device, but can't join the ranking without edit access.","บันทึกเวลาไว้ในเครื่องแล้ว แต่ยังขึ้นอันดับไม่ได้จนกว่าจะได้สิทธิ์ Editor")}`:""}<br>${tr("A new puzzle arrives tomorrow.","พรุ่งนี้มีด่านใหม่")}</p>
+    ${rk?`<br><b>${tr(`#${rk} today`,`อันดับ ${rk} ของวันนี้`)}</b>`:dailyDenied?`<br>${tr("Your time is saved on this device, but couldn't be added to today's ranking.","บันทึกเวลาไว้ในเครื่องแล้ว แต่เพิ่มเข้าอันดับวันนี้ไม่ได้")}`:""}<br>${tr("A new puzzle arrives tomorrow.","พรุ่งนี้มีด่านใหม่")}</p>
     <button class="big" id="seeDaily">${tr("See today's ranking","ดูอันดับวันนี้")}</button>
     <button class="big alt" id="leaveDaily">${tr(`Back to Level ${level}`,`กลับไปเลเวล ${level}`)}</button>`);
   $("seeDaily").onclick=()=>{exitFest();showBoard("daily")};$("leaveDaily").onclick=()=>{closeOv();exitFest()}}
@@ -1672,7 +1618,7 @@ let fitT=null;addEventListener("resize",()=>{clearTimeout(fitT);fitT=setTimeout(
   const dw=Math.abs(innerWidth-fitW),dh=Math.abs(innerHeight-fitH);if(dw<2&&(dh<160||sheetBelow)){placeSheet();placeDock();balAll();return}
   fitW=innerWidth;fitH=innerHeight;fit();placeSheet();placeDock();balAll()},120)});document.documentElement.classList.add("lock");applyMode();
 /* ---------- boot ---------- */
-document.querySelectorAll(".iconbtn,.tool .i:not(#placeIcon),.bulb,#guardPill").forEach(e=>{e.innerHTML=emo(e.innerHTML)});
+document.querySelectorAll(".iconbtn,.tool .i:not(#placeIcon),.bulb").forEach(e=>{e.innerHTML=emo(e.innerHTML)});
 startLevel();
 initCloud();
 if(!store.get("seenHelp",false)){store.set("seenHelp",true);store.set("seenVer",LATEST_VER);setTimeout(showHelp,300)}
