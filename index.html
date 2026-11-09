@@ -735,7 +735,7 @@ let userNS=null,myId=null,boardCol=null,boardRows=[],boardDenied=false,boardOpen
 let nick=store.get("nick",""),best=store.get("best",streak),saveDenied=false,noSaveShown=false;
 function saveCloud(){if(!cloud)return;clearTimeout(cloudTimer);cloudTimer=setTimeout(flushCloud,800)}
 async function flushCloud(){if(!cloud||guardLocked)return;if(cloudBusy){cloudDirty=true;return}cloudBusy=true;
-  try{await cloud.set({level,hX,hA,streak,score,theme:themeId,nick,best,lang,festWon,savedAt:Date.now()});if(saveDenied){saveDenied=false;renderStack()}}
+  try{await cloud.set({level,hX,hA,streak,score,theme:themeId,nick,best,lang,festWon,run:store.get("run",null),savedAt:Date.now()});if(saveDenied){saveDenied=false;renderStack()}}
   catch(e){if(!saveDenied){saveDenied=true;renderStack();markNoSave()}}
   if(boardCol&&myId){try{if(level>1||score>0)await boardCol.doc(myId).set({name:nick,level,stars:score,best,streak,updatedAt:Date.now()});boardDenied=false}
     catch(e){boardDenied=true}if(boardOpen)renderBoard()}
@@ -794,6 +794,8 @@ async function initCloud(){try{
   if(d&&Array.isArray(d.festWon)){const u=[...new Set([...festWon,...normFest(d.festWon)])];if(u.length!==festWon.length){festWon=u;store.set("festWon",festWon);if(P)applyTheme();renderFestBar()}}
   if(d){if(d.nick&&!nick){nick=String(d.nick).slice(0,16);store.set("nick",nick)}best=Math.max(best,d.best||0);store.set("best",best)}
   const better=d&&(d.level>level||(d.level===level&&(d.score||0)>score));
+  if(d&&d.run&&d.run.lvl===(better?d.level:level)){const lr=store.get("run",null);
+    if(better||!lr||lr.lvl!==d.run.lvl||(d.run.lives|0)<(lr.lives|0)){store.set("run",d.run);if(!better&&!busy&&mode==="main")startLevel()}}
   if(d&&RENAMED[d.theme])d.theme=RENAMED[d.theme];
   if(better||(d&&d.theme&&d.theme!==themeId)){if(d.theme&&THEMES.some(t=>t.id===d.theme)){themeId=d.theme;store.set("theme",themeId);applyTheme()}}
   if(better){level=d.level;hX=d.hX??hX;hA=d.hA??hA;streak=d.streak??0;score=d.score??0;
@@ -810,7 +812,7 @@ const XSVG='<svg class="x" viewBox="0 0 15 15" shape-rendering="crispEdges" aria
 let fitted=false;
 function startLevel(){
   busy=true;$("loading").hidden=false;board.style.visibility="hidden";
-  setTimeout(()=>{P=generate(level);setup();$("loading").hidden=true;board.style.visibility="";busy=false;if(!fitted){fitted=true;fit()}
+  setTimeout(()=>{P=generate(level);setup();restoreRun();$("loading").hidden=true;board.style.visibility="";busy=false;if(!fitted){fitted=true;fit()}
     if(!store.get("coached",false)&&level===1&&mode==="main"&&$("ov").hidden&&!coachStep)setTimeout(startCoach,400)},30);
 }
 function setup(){
@@ -827,7 +829,20 @@ function renderLives(){$("lives").innerHTML=Array.from({length:MAX_LIVES},(_,i)=
 function renderStrip(){const n=P.n;$("strip").innerHTML=Array.from({length:n},(_,i)=>`<span class="slot ${i<placed?"on":""}">${pxE(P.animal)}</span>`).join("")}
 function updateTools(){const f=mode!=="main";$("cxCount").innerHTML=f?ic("lock"):hX;$("anCount").innerHTML=f?ic("lock"):hA;
   $("crossBtn").disabled=f||hX<=0;$("animalBtn").disabled=f||hA<=0;$("undoBtn").disabled=!history.length}
-function setMark(k,v,record=true){if(marks[k]===v)return;if(record)history.push([k,marks[k]]);marks[k]=v;const e=cellEl(k);e.classList.toggle("x",v===1);e.classList.toggle("animal",v===2)}
+function setMark(k,v,record=true){if(marks[k]===v)return;if(record)history.push([k,marks[k]]);marks[k]=v;const e=cellEl(k);e.classList.toggle("x",v===1);e.classList.toggle("animal",v===2);if(mode==="main"&&!restoring)queueRun()}
+/* current attempt (board, hearts, mistakes) survives a page refresh, so refreshing can't refill hearts */
+let runT=null,restoring=false;
+function saveRun(){if(mode!=="main"||!P||!marks.length)return;clearTimeout(runT);store.set("run",{lvl:level,lives,mistakes,m:marks.join("")})}
+function queueRun(){clearTimeout(runT);runT=setTimeout(saveRun,300)}
+function restoreRun(){const r=store.get("run",null);
+  if(mode!=="main"||!P||!r||r.lvl!==level||typeof r.m!=="string"||r.m.length!==marks.length)return;
+  if((r.lives|0)<=0){store.set("run",null);resetStreak();return} // refreshed while losing: the loss still counts
+  restoring=true;
+  [...r.m].forEach((c,k)=>{if(c==="1")setMark(k,1,false)});
+  [...r.m].forEach((c,k)=>{if(c==="2"&&isSol(k)){setMark(k,2,false);placed++}});
+  restoring=false;
+  lives=Math.min(MAX_LIVES,r.lives|0);mistakes=r.mistakes|0;history=[];
+  renderLives();renderStrip();updateTools();if(placed===P.n)setTimeout(win,300)}
 
 /* ---------- placing ---------- */
 function isSol(k){const n=P.n;return P.sol[k/n|0]===k%n}
@@ -845,7 +860,7 @@ function placeAnimal(k,fromHint,auto){if(!fromHint&&!auto)coachPlaced();
       setTimeout(()=>{if(autoOn&&P&&placed===n-1&&lives>0&&marks[y*n+P.sol[y]]!==2)placeAnimal(y*n+P.sol[y],false,true)},450)}
     else checkAutoFill();
   }else{
-    const e=cellEl(k);e.classList.add("wrong");lives--;mistakes++;combo=0;renderLives();if(mode==="daily"){daily.mistakes++;saveDaily();renderDailyClock()}
+    const e=cellEl(k);e.classList.add("wrong");lives--;mistakes++;combo=0;renderLives();if(mode==="main"){saveRun();saveCloud()}if(mode==="daily"){daily.mistakes++;saveDaily();renderDailyClock()}
     setTimeout(()=>{e.classList.remove("wrong");setMark(k,1,false);if(lives<=0)lose()},550);
   }
 }
@@ -1021,7 +1036,7 @@ $("crossBtn").onclick=()=>{if(hX<=0||!canHint())return;clearFocus();const s=cros
   hX--;saveHints();usedHint=true;s.newT.forEach(k=>setMark(k,1,false));history=history.filter(([q])=>!s.newT.includes(q));updateTools();showHint(s);checkAutoFill()};
 $("animalBtn").onclick=()=>{if(hA<=0||!canHint())return;clearFocus();const s=animalHint();
   hA--;saveHints();usedHint=true;placeAnimal(s.cell,true);updateTools();showHint(s)};
-$("restartBtn").onclick=()=>{if(busy)return;if(mode==="main"&&mistakes>0)resetStreak();setup()};
+$("restartBtn").onclick=()=>{if(busy)return;if(mode==="main"&&mistakes>0)resetStreak();setup();if(mode==="main"){clearTimeout(runT);store.set("run",null);saveCloud()}};
 $("helpBtn").onclick=showMenu;
 
 /* ---------- overlays ---------- */
@@ -1194,7 +1209,7 @@ async function renderBoard(){const list=$("lbList"),note=$("boardNote"),pod=$("p
   else note.innerHTML=emo(g?tr("Ranked by ⭐ stars, then level.","เรียงตาม ⭐ ดาว แล้วตามเลเวล"):tr("Same 9×9 puzzle for everyone. Each mistake adds 30 seconds; ties go to fewer mistakes.","ด่าน 9×9 เดียวกันทุกคน วางผิดบวก 30 วินาที ถ้าเวลาเท่ากัน คนที่ผิดน้อยกว่าขึ้นก่อน"))}
 let boardNoteLock=false;
 $("boardBtn").onclick=()=>showBoard("goat");
-function win(){if(mode==="fest"){festWin();return}if(mode==="daily"){dailyWin();return}
+function win(){if(mode==="fest"){festWin();return}if(mode==="daily"){dailyWin();return}clearTimeout(runT);store.set("run",null);
   const mult=TIERS[tierIdx()],base=100+(mistakes===0?50:0),gain=base*mult;
   score+=gain;streak++;level++;best=Math.max(best,streak);store.set("best",best);
   const gotA=streak%3===0;
@@ -1224,7 +1239,7 @@ function showUnlock(t){
   $("keepTheme").onclick=()=>{closeOv();startLevel()};
 }
 function lose(){if(mode==="fest"){festLose();return}if(mode==="daily"){dailyLose();return}
-  const hadStreak=streak;resetStreak();
+  const hadStreak=streak;resetStreak();clearTimeout(runT);store.set("run",null);saveCloud();
   const tierX=TIERS[Math.min(hadStreak,TIERS.length-1)];
   overlay(`<div class="big-emoji">${pxE(T().life)}💨</div><h2>${tr(`Out of ${tLives(T())}`,`${tLives(T())}หมดแล้ว`)}</h2><p>${hadStreak?tr(`Your X${tierX} win streak is gone. `,`สถิติชนะติดกัน X${tierX} หายแล้ว `):""}${tr("Every row, column and colour needs exactly one piece, and pieces can't touch.","ทุกแถว ทุกคอลัมน์ และทุกโซนสีต้องมีตัวเดียวพอดี และห้ามวางติดกัน")}</p>
     <button class="big" id="retryBtn">${tr("Try again","ลองใหม่")}</button>`);
