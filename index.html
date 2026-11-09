@@ -1,9 +1,14 @@
-<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover"><style>/* stop double-tap zoom on phones; pinch zoom still works */html,body,button,a,input,label,.app,.overlay,.card{touch-action:manipulation}</style><script>/* iPhone home-screen apps can ignore the CSS rule above, so also swallow the 2nd quick tap outside the board
-   (the board keeps its own double-tap gesture) and pass it on as a normal click */
-(function(){let last=0;document.addEventListener("touchend",function(e){const now=Date.now(),t=e.target;
-  if(now-last<350&&e.changedTouches.length===1&&!(t.closest&&t.closest("#board,.board,input,textarea,select"))){
-    e.preventDefault();const c=t.closest&&t.closest("button,a,label,[onclick],.mitem,.theme,.tool,.iconbtn");if(c)c.click()}
-  last=now},{passive:false});
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover"><style>/* stop double-tap zoom on phones; pinch zoom still works */html,body,button,a,input,label,.app,.overlay,.card{touch-action:manipulation}</style><script>/* stop phone double-tap zoom (iPhone home-screen apps ignore the CSS rule above).
+   Board: the game reads taps from pointer events, so the phone's own touch handling is never needed there.
+   Elsewhere: swallow the 2nd quick tap and pass it on as a normal click. */
+(function(){let last=0;
+  document.addEventListener("touchend",function(e){const t=e.target,now=Date.now();
+    if(e.changedTouches.length!==1){last=now;return}
+    if(t.closest&&t.closest("#board,.board,.prboard")){e.preventDefault();last=now;return}
+    if(now-last<350&&!(t.closest&&t.closest("input,textarea,select"))){
+      e.preventDefault();const c=t.closest&&t.closest("button,a,label,summary,[onclick],.mitem,.theme,.tool,.iconbtn");if(c)c.click()}
+    last=now},{passive:false});
+  document.addEventListener("dblclick",function(e){e.preventDefault()},{passive:false});
   document.addEventListener("gesturestart",function(e){e.preventDefault()},{passive:false})})();</script><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
 <title>Off My Tiles!</title>
 <meta name="claude:viewport-fit-sides" content="cover">
