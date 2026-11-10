@@ -645,6 +645,12 @@ const WORD_COLORS=["#3f9b5c","#2a9d8f","#e8762b","#e0457b","#8b5cf6","#ff5ab0"];
 const COLOR_NAMES=["teal","pink","orange","purple","rose","sky-blue","brown","green","yellow","lime"];
 const MAX_LIVES=3;
 const TIERS=[1,2,4,8,10];
+/* ---------- stars (1.1.0): base pay grows with board size; +50% for a perfect clear (no mistakes, no hints) ---------- */
+const sizeBase=n=>100+25*(n-5);
+/* milestone levels pay a flat +10 × level (no streak, no perfect bonus): 100,150,200 · every 25 to 300 · every 15 to 390 · every 10 to 500 · every 5 after.
+   Keep in step with public.omt_max_gain in Supabase, which caps stars per level. */
+function isMilestone(L){if(L<100)return false;if(L<=200)return L%50===0;if(L<=300)return L%25===0;if(L<=390)return(L-300)%15===0;if(L<=500)return L%10===0;return L%5===0}
+const milestoneBonus=L=>isMilestone(L)?10*L:0;
 
 /* ---------- storage (best effort) ---------- */
 const store={get(k,d){try{const v=localStorage.getItem("zoo_"+k);return v==null?d:JSON.parse(v)}catch(e){return d}},
@@ -782,7 +788,7 @@ function updateTools(){const f=mode!=="main";$("cxCount").innerHTML=f?ic("lock")
 function setMark(k,v,record=true){if(marks[k]===v)return;if(record)history.push([k,marks[k]]);marks[k]=v;const e=cellEl(k);e.classList.toggle("x",v===1);e.classList.toggle("animal",v===2);if(mode==="main"&&!restoring)queueRun()}
 /* current attempt (board, hearts, mistakes) survives a page refresh, so refreshing can't refill hearts */
 let runT=null,restoring=false;
-function saveRun(){if(mode!=="main"||!P||!marks.length)return;clearTimeout(runT);store.set("run",{lvl:level,lives,mistakes,m:marks.join("")})}
+function saveRun(){if(mode!=="main"||!P||!marks.length)return;clearTimeout(runT);store.set("run",{lvl:level,lives,mistakes,usedHint,m:marks.join("")})}
 function queueRun(){clearTimeout(runT);runT=setTimeout(saveRun,300)}
 function restoreRun(){const r=store.get("run",null);
   if(mode!=="main"||!P||!r||r.lvl!==level||typeof r.m!=="string"||r.m.length!==marks.length)return;
@@ -791,7 +797,7 @@ function restoreRun(){const r=store.get("run",null);
   [...r.m].forEach((c,k)=>{if(c==="1")setMark(k,1,false)});
   [...r.m].forEach((c,k)=>{if(c==="2"&&isSol(k)){setMark(k,2,false);placed++}});
   restoring=false;
-  lives=Math.min(MAX_LIVES,r.lives|0);mistakes=r.mistakes|0;history=[];
+  lives=Math.min(MAX_LIVES,r.lives|0);mistakes=r.mistakes|0;usedHint=!!r.usedHint;history=[];
   renderLives();renderStrip();updateTools();if(placed===P.n)setTimeout(win,300)}
 
 /* ---------- placing ---------- */
@@ -928,7 +934,7 @@ function doSweep(k){const n=P.n,g=P.reg[k],name=COLOR_NAMES[g],cells=[];for(let 
   if(cells.some(q=>marks[q]===2)){$("hintText").textContent=`The ${name} area already has its animal. Tap a different colour.`;return}
   const targets=cells.filter(q=>marks[q]===0&&P.sol[q/n|0]!==q%n);
   if(!targets.length){$("hintText").textContent=`The ${name} area is already fully marked. Tap a different colour.`;return}
-  pickMode=false;board.classList.remove("picking");hS--;saveHints();usedHint=true;
+  pickMode=false;board.classList.remove("picking");hS--;saveHints();usedHint=true;if(mode==="main")queueRun();
   targets.forEach(q=>setMark(q,1,false));history=[];updateTools();
   showHint({kind:"elim",newT:targets,groups:[{cells}],title:`Swept the ${name} area`,
     text:`${targets.length} cell${targets.length>1?"s":""} in the ${name} area can't hold its animal and now ${targets.length>1?"have":"has"} ✕. Its animal goes in the one cell still open there. Double-tap it to place it.`})}
@@ -983,9 +989,9 @@ function lockPage(){const open=!$("hintSheet").hidden&&sheetBelow,r=document.doc
 let sheetBelow=false,sheetScrollT=null,fitW=0,fitH=0,sheetSide=false;
 const canHint=()=>mode==="main"&&!busy&&lives>0&&placed<P.n;
 $("crossBtn").onclick=()=>{if(hX<=0||!canHint())return;clearFocus();const s=crossHint();if(!s)return;
-  hX--;saveHints();usedHint=true;s.newT.forEach(k=>setMark(k,1,false));history=history.filter(([q])=>!s.newT.includes(q));updateTools();showHint(s);checkAutoFill()};
+  hX--;saveHints();usedHint=true;if(mode==="main")queueRun();s.newT.forEach(k=>setMark(k,1,false));history=history.filter(([q])=>!s.newT.includes(q));updateTools();showHint(s);checkAutoFill()};
 $("animalBtn").onclick=()=>{if(hA<=0||!canHint())return;clearFocus();const s=animalHint();
-  hA--;saveHints();usedHint=true;placeAnimal(s.cell,true);updateTools();showHint(s)};
+  hA--;saveHints();usedHint=true;if(mode==="main")queueRun();placeAnimal(s.cell,true);updateTools();showHint(s)};
 $("restartBtn").onclick=()=>{if(busy)return;if(mode==="main"&&mistakes>0)resetStreak();setup();if(mode==="main"){clearTimeout(runT);store.set("run",null);saveCloud()}};
 $("helpBtn").onclick=showMenu;
 
@@ -1092,6 +1098,7 @@ function avSq(r,pr,name,cls){const el=document.createElement("span");el.classNam
   return el}
 /* 🐐 champion theme: the first time you are #1 on the G.O.A.T. board, the G.O.A.T. theme is yours for good */
 const dailyCmp=(a,b)=>a.ms-b.ms||(a.mistakes||0)-(b.mistakes||0)||(a.at||0)-(b.at||0);
+const avgOf=r=>Math.round((r.stars||0)/Math.max(1,(r.level||1)-1));
 const goatCmp=(a,b)=>(b.stars||0)-(a.stars||0)||(b.level||0)-(a.level||0)||(a.updatedAt||0)-(b.updatedAt||0);
 const goatRows=()=>boardRows.filter(r=>(r.level||1)>1||(r.stars||0)>0).sort(goatCmp);
 function checkGoat(){if(!myId)return;const top=goatRows()[0],now=!!top&&top.id===myId;if(now===goatNow)return;
@@ -1134,25 +1141,25 @@ async function renderBoard(){const list=$("lbList"),note=$("boardNote"),pod=$("p
     [[1,"p2"],[0,"p1"],[2,"p3"]].forEach(([i,cls])=>{const r=rows[i],d=mk("div","pd "+cls);
       if(!r){pod.appendChild(d);return}if(r.id===myId)d.classList.add("me");
       const cr=mk("div","crown");cr.innerHTML=i===0?emo("👑"):"";
-      const st=mk("div","ps");st.innerHTML=emo(`<span>⭐ ${(r.stars||0).toLocaleString()}</span><i> · </i><span>${tr("Lv","เลเวล")} ${r.level||1}</span>`);
+      const st=mk("div","ps");st.innerHTML=emo(`<span>⭐ ${(r.stars||0).toLocaleString()}</span><i> · </i><span>${tr("Lv","เลเวล")} ${r.level||1}</span><i> · </i><span title="${tr("Average stars per level","ดาวเฉลี่ยต่อเลเวล")}">⌀ ${avgOf(r).toLocaleString()}</span>`);
       const sk=r.id===myId?streak:r.streak,sl=mk("div","pstreak");if(sk!=null){sl.innerHTML=emo(`🔥 ${sk}<span class="skw"> ${tr("streak","ติดกัน")}</span>`);sl.title=tr(`${sk} wins in a row`,`ชนะติดกัน ${sk} ครั้ง`)}
       d.append(cr,avSq(r,profs[r.id],nameOf(r),i===0?"lbav1":""),mk("b","pn",nameOf(r)+you(r)),st,sl,mk("div","blk",String(i+1)));pod.appendChild(d)});
     pod.hidden=!rows.length;
     podStack();try{document.fonts.ready.then(podStack)}catch(e){}
     rows.slice(3).forEach((r,j)=>{const row=mk("div","lbrow"+(r.id===myId?" me":"")),who=mk("div","lbwho"),mt=mk("div","lbmt");
-      mt.innerHTML=emo(`<span>⭐ ${(r.stars||0).toLocaleString()}</span> · <span>${tr("Lv","เลเวล")} ${r.level||1}</span> · <span>🔥 ${r.best||0}</span>`);who.append(mk("b","lbnm",nameOf(r)+you(r)),mt);
+      mt.innerHTML=emo(`<span>⭐ ${(r.stars||0).toLocaleString()}</span> · <span>${tr("Lv","เลเวล")} ${r.level||1}</span> · <span title="${tr("Average stars per level","ดาวเฉลี่ยต่อเลเวล")}">⌀ ${avgOf(r).toLocaleString()}</span> · <span>🔥 ${r.best||0}</span>`);who.append(mk("b","lbnm",nameOf(r)+you(r)),mt);
       row.append(mk("span","lbrk",String(j+4)),avSq(r,profs[r.id],nameOf(r)),who);list.appendChild(row)})}
   else rows.forEach((r,j)=>{const row=mk("div","lbrow"+(r.id===myId?" me":""));const m=r.mistakes||0;
       row.append(mk("span","lbrk",String(j+1)),avSq(r,profs[r.id],nameOf(r)),mk("b","lbnm",nameOf(r)+you(r)),mk("span","lbmiss",tr(`${m} miss`,`ผิด ${m}`)),mk("span","lbtime",fmtTime(r.ms)));list.appendChild(row)});
   if(boardNoteLock)return;
   if((g&&boardDenied)||(!g&&dailyDenied))note.textContent=tr("Your latest score couldn't be added to the ranking. It's still saved on this device. Check your internet and reload.","เพิ่มคะแนนล่าสุดเข้าอันดับไม่ได้ แต่ยังบันทึกไว้ในเครื่องนี้ ลองเช็กอินเทอร์เน็ตแล้วโหลดใหม่");
   else if(!rows.length)note.textContent=g?tr("No legends yet. Clear a level to claim the throne.","ยังไม่มีตำนาน ผ่านสักเลเวลเพื่อขึ้นบัลลังก์"):tr("Nobody has finished today's puzzle yet. Be the first!","ยังไม่มีใครผ่านด่านวันนี้ มาเป็นคนแรกกัน!");
-  else note.innerHTML=emo(g?tr("Ranked by ⭐ stars, then level.","เรียงตาม ⭐ ดาว แล้วตามเลเวล"):tr("Same 9×9 puzzle for everyone. Each mistake adds 30 seconds; ties go to fewer mistakes.","ด่าน 9×9 เดียวกันทุกคน วางผิดบวก 30 วินาที ถ้าเวลาเท่ากัน คนที่ผิดน้อยกว่าขึ้นก่อน"))}
+  else note.innerHTML=emo(g?tr("Ranked by ⭐ stars, then level. ⌀ = average stars per level.","เรียงตาม ⭐ ดาว แล้วตามเลเวล ⌀ = ดาวเฉลี่ยต่อเลเวล"):tr("Same 9×9 puzzle for everyone. Each mistake adds 30 seconds; ties go to fewer mistakes.","ด่าน 9×9 เดียวกันทุกคน วางผิดบวก 30 วินาที ถ้าเวลาเท่ากัน คนที่ผิดน้อยกว่าขึ้นก่อน"))}
 let boardNoteLock=false;
 $("boardBtn").onclick=()=>showBoard("goat");
 function win(){if(mode==="fest"){festWin();return}if(mode==="daily"){dailyWin();return}clearTimeout(runT);store.set("run",null);
-  const mult=TIERS[tierIdx()],base=100+(mistakes===0?50:0),gain=base*mult;
-  score+=gain;streak++;level++;best=Math.max(best,streak);store.set("best",best);
+  const lv=level,base=sizeBase(P.n),perfect=mistakes===0&&!usedHint,mult=TIERS[tierIdx()],gain=Math.floor(base*(perfect?1.5:1))*mult,bonus=milestoneBonus(lv);
+  score+=gain+bonus;streak++;level++;best=Math.max(best,streak);store.set("best",best);
   const gotA=streak%3===0;
   hX=Math.min(hX+2,99);if(gotA)hA=Math.min(hA+1,99);saveHints();
   const newTheme=THEMES.find(t=>!isEvent(t)&&t.at>1&&t.at===level-1);
@@ -1161,10 +1168,11 @@ function win(){if(mode==="fest"){festWin();return}if(mode==="daily"){dailyWin();
   const rewards=`<div class="rewards"><span>+2 ❌ ${cross}</span>${gotA?`<span>+1 ${pxE(P.animal)} ${place}</span>`:`<span class="soon">${tr(`${pxE(P.animal)} ${place} in ${left} win${left>1?"s":""}`,`${pxE(P.animal)} ${place} อีก ${left} ชนะ`)}</span>`}${newTheme?`<span>🎨 ${tr("New theme","ธีมใหม่")}: ${tName(newTheme)} ${pxE(newTheme.pieces[0])}</span>`:""}</div>`;
   store.set("level",level);store.set("streak",streak);store.set("score",score);saveCloud();
   renderStack(true);
-  const word=mistakes===0?tr("Unbelievable!","ไม่น่าเชื่อ!"):mistakes===1?tr("Great job!","เก่งมาก!"):tr("Solved!","ผ่านแล้ว!");
+  const word=perfect?tr("Unbelievable!","ไม่น่าเชื่อ!"):mistakes<=1?tr("Great job!","เก่งมาก!"):tr("Solved!","ผ่านแล้ว!");
   overlay(`<div class="big-emoji">${pxE(P.animal)}🎉</div><h2>${word}</h2>
-    <p>${mistakes===0?tr("Not a single mistake. Flawless!","ไม่ผิดเลยสักครั้ง สมบูรณ์แบบ!"):tr(`Level cleared with ${mistakes} mistake${mistakes>1?"s":""}.`,`ผ่านด่านโดยผิด ${mistakes} ครั้ง`)}</p>${rewards}
-    <div class="gain">⭐ ${base}${mistakes===0?tr(" (incl. +50 flawless)"," (รวม +50 ไม่ผิดเลย)"):""} × ${mult} = +${gain.toLocaleString()}</div>
+    <p>${perfect?tr("No mistakes, no hints. Perfect clear!","ไม่ผิดเลย ไม่ใช้คำใบ้ ผ่านแบบเพอร์เฟกต์!"):mistakes===0?tr("No mistakes, but a hint was used, so no perfect bonus.","ไม่ผิดเลย แต่ใช้คำใบ้ จึงไม่ได้โบนัสเพอร์เฟกต์"):tr(`Level cleared with ${mistakes} mistake${mistakes>1?"s":""}.`,`ผ่านด่านโดยผิด ${mistakes} ครั้ง`)}</p>${rewards}
+    <div class="gain">⭐ ${base}${perfect?tr(" × 1.5 perfect"," × 1.5 เพอร์เฟกต์"):""} × X${mult} = +${gain.toLocaleString()}</div>
+    ${bonus?`<div class="gain">🏁 ${tr(`Level ${lv} milestone`,`เลเวล ${lv} ด่านพิเศษ`)} +${bonus.toLocaleString()}</div>`:""}
     <div class="streakline">${tr(`🔥 ${streak} wins in a row · next level pays X${TIERS[tierIdx()]}`,`🔥 ชนะติดกัน ${streak} · ด่านต่อไปได้ X${TIERS[tierIdx()]}`)}</div>
     <button class="big" id="nextBtn">${tr("Level","เลเวล")} ${level}</button>`);
   $("nextBtn").onclick=()=>{if(newTheme)showUnlock(newTheme);else{closeOv();startLevel()}};
@@ -1216,7 +1224,9 @@ function showHelp(){dockSide="left";const pc=pxE(P?P.animal:"🦊");
     <button class="big" id="okBtn">${tr("Let's go","เริ่มเล่น")}</button>
     <details class="moreinfo"><summary>${tr("More about the game","เพิ่มเติมเกี่ยวกับเกม")}</summary><ul>
       ${more("💡",tr("Hints:","คำใบ้:"),tr(`❌ crosses out one cell (+2 per level). ${pc} places one piece (+1 every 3 wins in a row).`,`❌ ตัดช่องให้ 1 ช่อง (+2 ทุกด่าน) ${pc} วางให้ 1 ตัว (+1 ทุกชนะติดกัน 3 ครั้ง)`))}
-      ${more("🔥",tr("Streak:","ชนะติดกัน:"),tr("Win in a row to raise X1 → X10 ⭐ stars.","ชนะติดกันเพื่อเพิ่มตัวคูณ X1 → X10 ⭐"))}
+      ${more("⭐",tr("Stars:","ดาว:"),tr("Bigger boards pay more (100 on 5×5 up to 250 on 11×11). A perfect clear (no mistakes, no hints) pays +50%.","กระดานใหญ่ได้ดาวมากขึ้น (5×5 ได้ 100 ถึง 11×11 ได้ 250) ผ่านแบบเพอร์เฟกต์ (ไม่ผิด ไม่ใช้คำใบ้) ได้เพิ่ม 50%"))}
+      ${more("🔥",tr("Streak:","ชนะติดกัน:"),tr("Win in a row to raise X1 → X10 ⭐ stars. Running out of hearts, or restarting after a mistake, resets it.","ชนะติดกันเพื่อเพิ่มตัวคูณ X1 → X10 ⭐ ถ้าหัวใจหมด หรือกดเริ่มใหม่หลังวางผิด จะกลับไปเริ่มที่ X1"))}
+      ${more("🏁",tr("Milestones:","ด่านพิเศษ:"),tr("From Level 100, milestone levels pay a bonus of 10 × the level. They come more often the higher you go.","ตั้งแต่เลเวล 100 ด่านพิเศษได้โบนัส 10 × เลเวล และจะมาถี่ขึ้นเมื่อเลเวลสูงขึ้น"))}
       ${more("🎨",tr("Themes:","ธีม:"),tr("Clear levels 10, 20, 30… to unlock new pieces and colours.","ผ่านเลเวล 10, 20, 30… เพื่อปลดล็อกตัวหมากและสีใหม่"))}
       ${more("📅",tr("Daily:","รายวัน:"),tr("Same timed 9×9 for everyone. +30 s per mistake.","ด่าน 9×9 เดียวกันทุกคน จับเวลา วางผิด +30 วิ"))}
       ${more("🎉",tr("Festivals:","เทศกาล:"),tr("Beat a very hard puzzle to use its theme that month.","ผ่านด่านยากมากเพื่อใช้ธีมนั้นตลอดเดือน"))}
@@ -1343,6 +1353,11 @@ function coachPlaced(){if(!coachStep)return;coachStep=0;store.set("coached",true
    Bumping one number resets the ones to its right (1.3.4 -> 1.4.0). Tag the commit too: git tag v1.4.0
    History: v2..v18 (Claude artifact era) became 0.2.0..0.18.0, and v19 (own website) became 1.0.0. ---------- */
 const CHANGELOG=[
+ {v:"1.1.0",date:"2026-11-10",items:[
+  ["⭐","Bigger boards pay more stars: 100 on 5×5 up to 250 on 11×11.","กระดานใหญ่ได้ดาวมากขึ้น: 5×5 ได้ 100 ถึง 11×11 ได้ 250"],
+  ["✨","The perfect bonus is now +50%, and only for clears with no mistakes and no hints.","โบนัสเพอร์เฟกต์เป็น +50% และได้เฉพาะตอนผ่านโดยไม่ผิดและไม่ใช้คำใบ้"],
+  ["🏁","Milestone levels from Level 100 pay a bonus of 10 × the level.","ด่านพิเศษตั้งแต่เลเวล 100 ได้โบนัส 10 × เลเวล"],
+  ["🐐","G.O.A.T. shows each player's average stars per level (⌀).","G.O.A.T. แสดงดาวเฉลี่ยต่อเลเวลของแต่ละคน (⌀)"]]},
  {v:"1.0.1",date:"2026-11-10",items:[
   ["☰","The menu button at top left is now ☰. Tap it to find Settings and Sign in with Google.","ปุ่มเมนูมุมซ้ายบนเปลี่ยนเป็น ☰ แล้ว กดเพื่อเข้าหน้าตั้งค่าและล็อกอินด้วย Google"]]},
  {v:"1.0.0",date:"2026-11-09",items:[
