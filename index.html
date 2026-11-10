@@ -426,6 +426,10 @@ html,body{overscroll-behavior:none}
 .card.lbcard .lbhead h2{margin:0;font:400 11px/1.5 var(--pixel)!important;color:var(--lbacc)!important;text-transform:uppercase;text-shadow:none;text-align:left}
 :root[lang="th"] .card.lbcard .lbhead h2{font:700 18px/1.3 var(--pixel)!important}
 .lbsub{font:600 13px var(--body);color:var(--lbmut)}
+.ovx{position:absolute;top:10px;right:10px;z-index:2;width:34px;height:34px;padding:0;border:3px solid var(--line);background:var(--bg);color:var(--ink);box-shadow:inset 0 -3px 0 rgba(0,0,0,.18);font:700 16px/1 var(--body);cursor:pointer;display:grid;place-items:center}
+.ovx:active{transform:translateY(2px)}.ovx:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.card.lbgoat .ovx,.card.lbcard .ovx{background:#1a1c2c;color:#f3dfa8;border-color:#0f1020}
+.card:has(>.ovx)>h2:first-of-type,.card:has(>.ovx)>.prhead{padding-right:40px;padding-left:40px}
 .lbx{width:34px;height:34px;flex-shrink:0;padding:0;border:3px solid #0f1020;background:var(--lbx);box-shadow:inset 0 -3px 0 var(--lbbg);font:400 10px var(--pixel);color:var(--lbink);cursor:pointer}
 .lbtabs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px}
 .lbtabs button{height:38px;border:3px solid #0f1020;background:#1a1c2c;font:400 9px var(--pixel);color:var(--lbmut);cursor:pointer;text-transform:uppercase}
@@ -1020,9 +1024,14 @@ function dockPlan(side){/* the board slides with a transition, so work from its 
 function placeDock(){const o=$("ov");if(o.hidden||!o.dataset.side)return;const plan=dockPlan(o.dataset.side);
   if(!plan){o.classList.remove("docked");o.style.left=o.style.width="";if(!sheetSide)setShift(0);return}
   o.classList.add("docked");o.style.left=Math.round(plan.left+plan.dx*0)+"px";o.style.width=plan.w+"px";setShift(plan.dx)}
+/* every pop-up gets a ✕ in its top corner, except results where the player must pick what happens next (noX) and cards with their own close button */
+let noX=false;
 function overlay(html){const side=dockSide;dockSide=null;const c=$("ovCard");c.className="card";c.removeAttribute("style");c.innerHTML=emo(html);
+  const skipX=noX;noX=false;
+  if(!skipX&&!c.querySelector(".prx,.lbx")){const x=document.createElement("button");x.className="ovx";x.type="button";x.setAttribute("aria-label",tr("Close","ปิด"));x.textContent="✕";x.onclick=closeOv;c.prepend(x)}
   const o=$("ov");if(side&&!$("hintSheet").hidden)clearFocus();o.dataset.side=side||"";o.classList.remove("docked");o.style.left=o.style.width="";
   if(!side&&!sheetSide)setShift(0);fitCard();o.hidden=false;if(side)placeDock();balAll(c)}
+document.addEventListener("keydown",e=>{if(e.key!=="Escape"||$("ov").hidden)return;const x=$("ovCard").querySelector(".ovx,.prx,.lbx");if(x){e.preventDefault();x.click()}});
 function closeOv(){const o=$("ov");o.hidden=true;o.dataset.side="";o.classList.remove("docked");if(!sheetSide)setShift(0);boardOpen=false;if(pendingGoat){const k=pendingGoat;pendingGoat=null;setTimeout(()=>showGoatNote(k),250)}else if(pendingGuest){pendingGuest=false;setTimeout(showGuest,250)}else if(pendingNoSave){pendingNoSave=false;setTimeout(showNoSave,250)}else if(pendingNews){pendingNews=false;setTimeout(()=>showNews(false),250)}}
 /* ---------- guest notice: shown once to players who aren't signed in ---------- */
 let pendingGuest=false;
@@ -1169,7 +1178,7 @@ function win(){if(mode==="fest"){festWin();return}if(mode==="daily"){dailyWin();
   store.set("level",level);store.set("streak",streak);store.set("score",score);saveCloud();
   renderStack(true);
   const word=perfect?tr("Unbelievable!","ไม่น่าเชื่อ!"):mistakes<=1?tr("Great job!","เก่งมาก!"):tr("Solved!","ผ่านแล้ว!");
-  overlay(`<div class="big-emoji">${pxE(P.animal)}🎉</div><h2>${word}</h2>
+  noX=true;overlay(`<div class="big-emoji">${pxE(P.animal)}🎉</div><h2>${word}</h2>
     <p>${perfect?tr("No mistakes, no hints. Perfect clear!","ไม่ผิดเลย ไม่ใช้คำใบ้ ผ่านแบบเพอร์เฟกต์!"):mistakes===0?tr("No mistakes, but a hint was used, so no perfect bonus.","ไม่ผิดเลย แต่ใช้คำใบ้ จึงไม่ได้โบนัสเพอร์เฟกต์"):tr(`Level cleared with ${mistakes} mistake${mistakes>1?"s":""}.`,`ผ่านด่านโดยผิด ${mistakes} ครั้ง`)}</p>${rewards}
     <div class="gain">⭐ ${base}${perfect?tr(" × 1.5 perfect"," × 1.5 เพอร์เฟกต์"):""} × X${mult} = +${gain.toLocaleString()}</div>
     ${bonus?`<div class="gain">🏁 ${tr(`Level ${lv} milestone`,`เลเวล ${lv} ด่านพิเศษ`)} +${bonus.toLocaleString()}</div>`:""}
@@ -1178,7 +1187,7 @@ function win(){if(mode==="fest"){festWin();return}if(mode==="daily"){dailyWin();
   $("nextBtn").onclick=()=>{if(newTheme)showUnlock(newTheme);else{closeOv();startLevel()}};
 }
 function showUnlock(t){
-  overlay(`<div class="unlock-burst" aria-hidden="true">${t.pieces.slice(0,6).map((p,i)=>`<span style="--i:${i}">${pxE(p)}</span>`).join("")}</div>
+  noX=true;overlay(`<div class="unlock-burst" aria-hidden="true">${t.pieces.slice(0,6).map((p,i)=>`<span style="--i:${i}">${pxE(p)}</span>`).join("")}</div>
     <div class="big-emoji unlock-hero">${pxE(t.pieces[0])}</div>
     <h2>${tr("New theme!","ปลดล็อกธีมใหม่!")}</h2><p>${tr(`Congrats! You unlocked <b>${tName(t)}</b>.`,`ยินดีด้วย! คุณปลดล็อกธีม <b>${tName(t)}</b>`)}</p>
     <div class="unlock-preview"><span>${t.pieces.slice(0,5).map(pxE).join(" ")}</span><small>${tr("Lives","ชีวิต")}: ${pxE(t.life)} ${pxE(t.life)} ${pxE(t.life)}</small></div>
@@ -1190,7 +1199,7 @@ function showUnlock(t){
 function lose(){if(mode==="fest"){festLose();return}if(mode==="daily"){dailyLose();return}
   const hadStreak=streak;resetStreak();clearTimeout(runT);store.set("run",null);saveCloud();
   const tierX=TIERS[Math.min(hadStreak,TIERS.length-1)];
-  overlay(`<div class="big-emoji">${pxE(T().life)}💨</div><h2>${tr(`Out of ${tLives(T())}`,`${tLives(T())}หมดแล้ว`)}</h2><p>${hadStreak?tr(`Your X${tierX} win streak is gone. `,`สถิติชนะติดกัน X${tierX} หายแล้ว `):""}${tr("Every row, column and colour needs exactly one piece, and pieces can't touch.","ทุกแถว ทุกคอลัมน์ และทุกโซนสีต้องมีตัวเดียวพอดี และห้ามวางติดกัน")}</p>
+  noX=true;overlay(`<div class="big-emoji">${pxE(T().life)}💨</div><h2>${tr(`Out of ${tLives(T())}`,`${tLives(T())}หมดแล้ว`)}</h2><p>${hadStreak?tr(`Your X${tierX} win streak is gone. `,`สถิติชนะติดกัน X${tierX} หายแล้ว `):""}${tr("Every row, column and colour needs exactly one piece, and pieces can't touch.","ทุกแถว ทุกคอลัมน์ และทุกโซนสีต้องมีตัวเดียวพอดี และห้ามวางติดกัน")}</p>
     <button class="big" id="retryBtn">${tr("Try again","ลองใหม่")}</button>`);
   $("retryBtn").onclick=()=>{closeOv();setup()};
 }
@@ -1353,6 +1362,8 @@ function coachPlaced(){if(!coachStep)return;coachStep=0;store.set("coached",true
    Bumping one number resets the ones to its right (1.3.4 -> 1.4.0). Tag the commit too: git tag v1.4.0
    History: v2..v18 (Claude artifact era) became 0.2.0..0.18.0, and v19 (own website) became 1.0.0. ---------- */
 const CHANGELOG=[
+ {v:"1.1.1",date:"2026-11-10",items:[
+  ["✕","Every menu and pop-up has a ✕ in the top corner to close it. Win and lose screens still ask what to do next.","ทุกเมนูและป๊อปอัปมีปุ่ม ✕ มุมบนสำหรับปิด ส่วนหน้าชนะและแพ้ยังให้เลือกว่าจะทำอะไรต่อ"]]},
  {v:"1.1.0",date:"2026-11-10",items:[
   ["⭐","Bigger boards pay more stars: 100 on 5×5 up to 250 on 11×11.","กระดานใหญ่ได้ดาวมากขึ้น: 5×5 ได้ 100 ถึง 11×11 ได้ 250"],
   ["✨","The perfect bonus is now +50%, and only for clears with no mistakes and no hints.","โบนัสเพอร์เฟกต์เป็น +50% และได้เฉพาะตอนผ่านโดยไม่ผิดและไม่ใช้คำใบ้"],
@@ -1572,7 +1583,7 @@ function dailyRank(){const rows=dailyRows.filter(r=>r.date===dayKey()&&r.ms>0).s
 async function dailyWin(){pauseDaily();daily.done=true;daily.final=daily.ms+daily.mistakes*DAILY_PENALTY;saveDaily();
   if(dailyCol&&myId){try{await dailyCol.doc(myId).set({date:daily.date,ms:daily.final,mistakes:daily.mistakes,name:nick,at:Date.now()});dailyDenied=false}catch(e){dailyDenied=true}}
   const rk=dailyRank();
-  overlay(`<div class="big-emoji">📅🎉</div><h2>${tr("Daily complete!","ผ่านเกมรายวัน!")}</h2>
+  noX=true;overlay(`<div class="big-emoji">📅🎉</div><h2>${tr("Daily complete!","ผ่านเกมรายวัน!")}</h2>
     <div class="gain" style="font-size:34px">⏱ ${fmtTime(daily.final)}</div>
     <p>${daily.mistakes?tr(`Includes +${daily.mistakes*30}s for ${daily.mistakes} mistake${daily.mistakes>1?"s":""}.`,`รวมเวลาปรับ +${daily.mistakes*30} วิ จากการวางผิด ${daily.mistakes} ครั้ง`):tr("No mistakes. Clean run!","ไม่ผิดเลย สุดยอด!")}
     ${rk?`<br><b>${tr(`#${rk} today`,`อันดับ ${rk} ของวันนี้`)}</b>`:dailyDenied?`<br>${tr("Your time is saved on this device, but couldn't be added to today's ranking.","บันทึกเวลาไว้ในเครื่องแล้ว แต่เพิ่มเข้าอันดับวันนี้ไม่ได้")}`:""}<br>${tr("A new puzzle arrives tomorrow.","พรุ่งนี้มีด่านใหม่")}</p>
@@ -1580,7 +1591,7 @@ async function dailyWin(){pauseDaily();daily.done=true;daily.final=daily.ms+dail
     <button class="big alt" id="leaveDaily">${tr(`Back to Level ${level}`,`กลับไปเลเวล ${level}`)}</button>`);
   $("seeDaily").onclick=()=>{exitFest();showBoard("daily")};$("leaveDaily").onclick=()=>{closeOv();exitFest()}}
 function dailyLose(){
-  overlay(`<div class="big-emoji">${pxE(curTheme().life)}💨</div><h2>${tr("Out of hearts","หัวใจหมดแล้ว")}</h2>
+  noX=true;overlay(`<div class="big-emoji">${pxE(curTheme().life)}💨</div><h2>${tr("Out of hearts","หัวใจหมดแล้ว")}</h2>
     <p>${tr("Your timer keeps going. Try today's puzzle again.","ตัวจับเวลายังเดินต่อ ลองด่านวันนี้อีกครั้ง")}</p>
     <button class="big" id="retryBtn">${tr("Try again","ลองใหม่")}</button>
     <button class="big alt" id="leaveDaily">${tr(`Back to Level ${level}`,`กลับไปเลเวล ${level}`)}</button>`);
@@ -1605,7 +1616,7 @@ function exitFest(){if(mode==="main")return;if(mode==="daily")pauseDaily();mode=
   P=s.P;setup();s.marks.forEach((v,k)=>{if(v)setMark(k,v,false)});lives=s.lives;placed=s.placed;combo=s.combo;mistakes=s.mistakes;
   renderLives();renderStrip();updateTools();renderFestBar();fit()}
 function festWin(){const t=festT;if(!wonNow(t.id)){festWon.push(festKey(t.id));store.set("festWon",festWon);saveCloud()}
-  overlay(`<div class="unlock-burst" aria-hidden="true">${t.pieces.slice(0,6).map((p,i)=>`<span style="--i:${i}">${pxE(p)}</span>`).join("")}</div>
+  noX=true;overlay(`<div class="unlock-burst" aria-hidden="true">${t.pieces.slice(0,6).map((p,i)=>`<span style="--i:${i}">${pxE(p)}</span>`).join("")}</div>
     <div class="big-emoji unlock-hero">${pxE(t.pieces[0])}</div>
     <h2>${tr("Festival complete!","ผ่านภารกิจเทศกาล!")}</h2><p>${tr(`You beat the challenge! The <b>${tName(t)}</b> theme is yours for the rest of this festival month. Next year there's a new puzzle to win it again.`,`คุณผ่านภารกิจแล้ว! ใช้ธีม<b>${tName(t)}</b>ได้ตลอดเดือนเทศกาลนี้ ปีหน้าจะมีด่านใหม่ให้ผ่านอีกครั้ง`)}</p>
     <div class="unlock-preview"><span>${t.pieces.slice(0,5).map(pxE).join(" ")}</span><small>${tr("Lives","ชีวิต")}: ${pxE(t.life)} ${pxE(t.life)} ${pxE(t.life)}</small></div>
@@ -1614,7 +1625,7 @@ function festWin(){const t=festT;if(!wonNow(t.id)){festWon.push(festKey(t.id));s
   $("useTheme").onclick=()=>{themeId=t.id;store.set("theme",themeId);saveCloud();closeOv();exitFest()};
   $("keepTheme").onclick=()=>{closeOv();exitFest()}}
 function festLose(){const t=festT;
-  overlay(`<div class="big-emoji">${pxE(t.life)}💨</div><h2>${tr("Out of hearts","หัวใจหมดแล้ว")}</h2>
+  noX=true;overlay(`<div class="big-emoji">${pxE(t.life)}💨</div><h2>${tr("Out of hearts","หัวใจหมดแล้ว")}</h2>
     <p>${tr("No stars or streak lost. The festival puzzle is waiting whenever you're ready.","ไม่เสียดาวหรือสถิติชนะติดกัน ลองภารกิจเทศกาลใหม่ได้ทุกเมื่อ")}</p>
     <button class="big" id="retryBtn">${tr("Try again","ลองใหม่")}</button>
     <button class="big alt" id="leaveFest">${tr(`Back to Level ${level}`,`กลับไปเลเวล ${level}`)}</button>`);
