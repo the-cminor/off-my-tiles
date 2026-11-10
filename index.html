@@ -487,7 +487,7 @@ html,body{overscroll-behavior:none}
 
 <div class="wrap"><div class="app">
   <header>
-    <div class="hbtns"><button class="iconbtn" id="helpBtn" aria-label="Menu">?</button><button class="iconbtn" id="boardBtn" aria-label="Leaderboard">🏆</button></div>
+    <div class="hbtns"><button class="iconbtn" id="helpBtn" aria-label="Menu" title="Menu"><svg class="pxe" viewBox="0 0 9 9" aria-hidden="true"><rect x="1" y="1" width="7" height="1" fill="currentColor"/><rect x="1" y="4" width="7" height="1" fill="currentColor"/><rect x="1" y="7" width="7" height="1" fill="currentColor"/></svg></button><button class="iconbtn" id="boardBtn" aria-label="Leaderboard">🏆</button></div>
     <div class="title">
       <h1 id="lvl">Level 1</h1>
       <div class="diffline"><span class="diff" id="diff">Easy</span><span class="streak" id="streakTag"></span></div>
@@ -1343,6 +1343,8 @@ function coachPlaced(){if(!coachStep)return;coachStep=0;store.set("coached",true
    Bumping one number resets the ones to its right (1.3.4 -> 1.4.0). Tag the commit too: git tag v1.4.0
    History: v2..v18 (Claude artifact era) became 0.2.0..0.18.0, and v19 (own website) became 1.0.0. ---------- */
 const CHANGELOG=[
+ {v:"1.0.1",date:"2026-11-10",items:[
+  ["☰","The menu button at top left is now ☰. Tap it to find Settings and Sign in with Google.","ปุ่มเมนูมุมซ้ายบนเปลี่ยนเป็น ☰ แล้ว กดเพื่อเข้าหน้าตั้งค่าและล็อกอินด้วย Google"]]},
  {v:"1.0.0",date:"2026-11-09",items:[
   ["🏠","Off My Tiles! has its own website now. No Claude account needed: just open the link and play.","Off My Tiles! มีเว็บของตัวเองแล้ว ไม่ต้องมีบัญชี Claude แค่เปิดลิงก์ก็เล่นได้เลย"],
   ["🔑","Sign in with Google in Settings to keep your save on any phone or computer.","ล็อกอินด้วย Google ในหน้าตั้งค่า เพื่อเล่นต่อได้ทุกเครื่อง"],
