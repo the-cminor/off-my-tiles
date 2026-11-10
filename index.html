@@ -996,7 +996,18 @@ $("crossBtn").onclick=()=>{if(hX<=0||!canHint())return;clearFocus();const s=cros
   hX--;saveHints();usedHint=true;if(mode==="main")queueRun();s.newT.forEach(k=>setMark(k,1,false));history=history.filter(([q])=>!s.newT.includes(q));updateTools();showHint(s);checkAutoFill()};
 $("animalBtn").onclick=()=>{if(hA<=0||!canHint())return;clearFocus();const s=animalHint();
   hA--;saveHints();usedHint=true;if(mode==="main")queueRun();placeAnimal(s.cell,true);updateTools();showHint(s)};
-$("restartBtn").onclick=()=>{if(busy)return;if(mode==="main"&&mistakes>0)resetStreak();setup();if(mode==="main"){clearTimeout(runT);store.set("run",null);saveCloud()}};
+function doRestart(){if(mode==="main"&&mistakes>0)resetStreak();setup();if(mode==="main"){clearTimeout(runT);store.set("run",null);saveCloud()}}
+/* ↻ asks first whenever there is something on the board to lose */
+$("restartBtn").onclick=()=>{if(busy)return;
+  if(!mistakes&&!marks.some(v=>v)){doRestart();return}
+  const loseStreak=mode==="main"&&mistakes>0&&streak>0,tx=TIERS[tierIdx()];
+  const what=mode==="daily"?tr("today's puzzle","ด่านวันนี้"):mode==="fest"?tr("the festival puzzle","ด่านเทศกาล"):tr(`Level ${level}`,`เลเวล ${level}`);
+  overlay(`<div class="big-emoji">↻</div><h2>${tr(`Restart ${what}?`,`เริ่ม${what}ใหม่?`)}</h2>
+    <p>${loseStreak?tr(`You've made a mistake, so restarting resets your 🔥 X${tx} win streak to X1.`,`คุณวางผิดไปแล้ว ถ้าเริ่มใหม่ สถิติชนะติดกัน 🔥 X${tx} จะกลับไปเป็น X1`)
+      :tr("Your ❌ marks and pieces on this board will be cleared.","กากบาท ❌ และตัวหมากบนกระดานนี้จะถูกล้างทั้งหมด")}${mode==="daily"?" "+tr("The timer and mistake penalties keep counting.","ตัวจับเวลาและเวลาปรับจากการวางผิดยังนับต่อ"):""}</p>
+    <button class="big${loseStreak?" danger":""}" id="rsYes">${tr("Yes, restart","ใช่ เริ่มใหม่")}</button>
+    <button class="big alt" id="rsNo">${tr("Keep playing","เล่นต่อ")}</button>`);
+  $("rsYes").onclick=()=>{closeOv();doRestart()};$("rsNo").onclick=closeOv};
 $("helpBtn").onclick=showMenu;
 
 /* ---------- overlays ---------- */
@@ -1361,6 +1372,9 @@ function coachPlaced(){if(!coachStep)return;coachStep=0;store.set("coached",true
    Bumping one number resets the ones to its right (1.3.4 -> 1.4.0). Tag the commit too: git tag v1.4.0
    History: v2..v18 (Claude artifact era) became 0.2.0..0.18.0, and v19 (own website) became 1.0.0. ---------- */
 const CHANGELOG=[
+ {v:"1.1.3",date:"2026-11-10",items:[
+  ["↻","Restart now asks first, and warns you when restarting would reset your win streak.","ปุ่มเริ่มใหม่จะถามก่อน และเตือนถ้าการเริ่มใหม่จะทำให้สถิติชนะติดกันหาย"],
+  ["⚠️","Start over in Settings asks twice before taking you back to Level 1.","เริ่มใหม่ทั้งหมดในหน้าตั้งค่าจะถามสองครั้งก่อนกลับไปเลเวล 1"]]},
  {v:"1.1.2",date:"2026-11-10",items:[
   ["🐐","G.O.A.T. no longer shows average stars per level.","G.O.A.T. ไม่แสดงดาวเฉลี่ยต่อเลเวลแล้ว"],
   ["☰","The main menu closes with Done, without a ✕.","เมนูหลักปิดด้วยปุ่ม Done ไม่มี ✕ แล้ว"]]},
@@ -1456,7 +1470,14 @@ function confirmReset(){dockSide="left";
       <li><b>ยังอยู่:</b> ภาษา ชื่อ ธีมเทศกาล และผลเกมรายวันของวันนี้</li>`)}</ul>
     <button class="big danger" id="resetYes">${tr("Yes, start over","ใช่ เริ่มใหม่")}</button>
     <button class="big alt" id="resetNo">${tr("Cancel","ยกเลิก")}</button>`);
-  $("resetYes").onclick=doReset;$("resetNo").onclick=showSettings}
+  $("resetYes").onclick=confirmReset2;$("resetNo").onclick=showSettings}
+/* second check before Start over, since it can't be undone */
+function confirmReset2(){dockSide="left";
+  overlay(`<div class="big-emoji">⚠️</div><h2>${tr("Are you sure?","แน่ใจนะ?")}</h2>
+    <p>${tr(`You'll lose Level ${level} and ⭐ ${score.toLocaleString()} stars, and go back to Level 1.`,`เลเวล ${level} และ ⭐ ${score.toLocaleString()} ดาวจะหายไป แล้วกลับไปเริ่มที่เลเวล 1`)}</p>
+    <button class="big danger" id="reset2Yes">${tr("Start over","เริ่มใหม่")}</button>
+    <button class="big alt" id="reset2No">${tr("Cancel","ยกเลิก")}</button>`);
+  $("reset2Yes").onclick=doReset;$("reset2No").onclick=showSettings}
 async function doReset(){
   if(mode!=="main"){if(mode==="daily")pauseDaily();mode="main";festT=null;mainSnap=null}
   level=1;score=0;streak=0;best=0;hX=5;hA=1;themeId="animals";coachStep=0;
