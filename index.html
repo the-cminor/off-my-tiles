@@ -199,6 +199,11 @@ header{width:100%;display:grid;grid-template-columns:86px 1fr 86px;align-items:c
 .prvis{margin:0;min-height:0}
 .practice .prmsg small{font-size:14px;line-height:1.35}.practice .prnote{font-size:15px;line-height:1.4;color:var(--ink);padding:6px 2px;min-height:48px}
 .cell.nope{animation:shake .45s}
+.prboard .cell.ghost .a{opacity:.7;transform:scale(1);animation:none}
+.prboard .cell.ghost{outline:3px dashed #7c3aed;outline-offset:-4px}
+.prboard .cell.ghost[data-n]::after{content:attr(data-n);position:absolute;right:1px;top:0;font:900 13px var(--body);color:#fff;background:#7c3aed;padding:0 4px;z-index:3}
+.prboard .cell.badg{outline:3px solid #e11d48;outline-offset:-3px}
+.fxsteps{text-align:left;font:700 14px/1.45 var(--body);color:var(--ink);padding:6px 4px}
 .prboard.focus .cell{opacity:.88}.prboard.focus .cell.grp{opacity:1}
 
 .tool .badge.state{background:var(--good)}
@@ -1373,13 +1378,32 @@ const TRICKS=[
   rule:["Would a piece here leave a colour with no empty cell? Then this cell can't hold a piece, so ✕ it.", "ถ้าวางตัวตรงนี้แล้วมีสีไหนไม่เหลือช่องว่าง ช่องนี้ก็วางไม่ได้ ใส่ ✕"],
   task:["Pick a cell, imagine a piece there. Does it block a whole colour? Tap it.", "เลือกช่อง แล้วลองนึกว่าวางตัวตรงนั้น ถ้าบล็อกสีทั้งสีได้ ให้แตะช่องนั้น"],test:st=>st.vis.t==="block"},
  {id:"force",n:7,ic:"🔮",en:"What-if",th:"ลองสมมติ",
-  rule:["Pretend a piece is here. If that forces moves until a colour has no room, the pretend was wrong, so ✕.", "ลองสมมติว่าวางตัวตรงนี้ ถ้าต้องวางต่อเรื่อยๆ จนมีสีหนึ่งไม่เหลือที่ แปลว่าสมมติผิด ใส่ ✕"],
-  task:["Hardest one. Try a cell, follow what it forces. Tap the one that fails. Stuck? Tap Show me.", "ข้อยากสุด ลองช่องหนึ่งแล้วไล่ดูว่าบังคับอะไรต่อ แตะช่องที่ล้มเหลว ติดแล้วกด ช่วยชี้"],test:st=>st.vis.t==="force"}];
+  rule:["Pretend a piece goes in a cell. Follow the pieces that become forced. If some colour runs out of room, your pretend was wrong: ✕ that cell.", "สมมติว่าวางตัวในช่องหนึ่ง แล้วไล่ดูตัวที่ต้องวางตาม ถ้ามีสีหนึ่งไม่เหลือที่วาง แปลว่าสมมติผิด ใส่ ✕ ช่องนั้น"],
+  task:["Hardest one. Pick a cell, pretend, and follow the forced pieces. Tap a cell whose pretend fails. Stuck? Tap Show me.", "ข้อยากสุด เลือกช่อง สมมติ แล้วไล่ตัวที่ถูกบังคับ แตะช่องที่สมมติแล้วล้มเหลว ติดแล้วกด ช่วยชี้"],test:st=>st.vis.t==="force"}];
 function withP(p,fn){const sv=P;P=p;try{return fn()}finally{P=sv}}
 function prBuild(n,p){const b=$("prBoard"),pc=pxE(curTheme().pieces[0]),fs=Math.floor(296/n*0.62);b.innerHTML="";b.classList.remove("focus");b.style.gridTemplateColumns=`repeat(${n},1fr)`;
   for(let k=0;k<n*n;k++){const d=document.createElement("div");d.className="cell";d.dataset.k=k;d.innerHTML=XSVG+`<span class="a" style="font-size:${fs}px">${pc}</span>`;
     const col=palNow[p.reg[k]%palNow.length];d.style.background=col;d.style.setProperty("--cellx",xColorFor(col));b.appendChild(d)}}
 /* one board for all five tricks: find a 7×7 where the hint engine meets every trick, and remember the board as it stands at each one */
+/* every answer the trick allows, not only the first one the engine happened to find */
+function confineAll(M,G,k){const n=P.n,lineOf={row:q=>q/n|0,col:q=>q%n,reg:q=>P.reg[q]},out=new Set();
+  for(const[st2,tt]of[["reg","row"],["reg","col"],["row","reg"],["col","reg"]]){
+    const src=G.filter(g=>g.t===st2&&!hasA(M,g)&&openC(M,g).length);if(src.length<k)continue;
+    for(const c of combos(src,k)){const idx=new Set();c.forEach(g=>openC(M,g).forEach(q=>idx.add(lineOf[tt](q))));if(idx.size!==k)continue;
+      const tg=[...idx].map(i=>G.find(g=>g.t===tt&&g.i===i)),inSrc=q=>c.some(g=>g.cells.includes(q));
+      tg.forEach(g=>g.cells.forEach(q=>{if(M.cand[q]&&!inSrc(q))out.add(q)}))}}
+  return[...out]}
+function prAlts(ti,st,M,G,m,n){
+  if(ti===0){const cells=[],text={};G.forEach(g=>{if(hasA(M,g))return;const o=openC(M,g);if(o.length===1&&!cells.includes(o[0])){cells.push(o[0]);
+      text[o[0]]=tr(`${cap(gname(g))} has only one open cell left, so its piece must go here.`,`${gname(g)}เหลือช่องว่างแค่ช่องเดียว ตัวจึงต้องวางตรงนี้`)}});
+    if(cells.length){st.cells=cells;st.cellText=text}}
+  else if(ti===1||ti===2){const more=(ti===1?confineAll(M,G,1):[...confineAll(M,G,2),...confineAll(M,G,3)]).filter(q=>m[q]===0);
+    st.targets0=st.targets.slice();st.targets=[...new Set([...st.targets,...more])]}}
+function prForce(c){const{n}=PR;return withP(PR.p,()=>{const G=buildGroups(),T2={cand:new Array(n*n).fill(true),placed:new Array(n*n).fill(false)};
+    PR.m.forEach((v,k)=>{if(v===1)T2.cand[k]=false});PR.m.forEach((v,k)=>{if(v===2)mPlace(T2,k)});mPlace(T2,c);const chain=[];
+    for(let guard=0;guard<200;guard++){let moved=false;
+      for(const g of G){if(hasA(T2,g))continue;const o=openC(T2,g);if(!o.length)return{c,chain,bad:g,name:gname(g)};if(o.length===1){chain.push(o[0]);mPlace(T2,o[0]);moved=true;break}}
+      if(!moved)break}return null})}
 function prBoardFind(seed){const n=7;
   for(let i=0;i<3000;i++){const p=generateN(n,rng(88000+seed*7919+i));p.n=n;p.animal=curTheme().pieces[0];
     const r=withP(p,()=>{const G=buildGroups(),M={cand:new Array(n*n).fill(true),placed:new Array(n*n).fill(false)},m=new Array(n*n).fill(0),got=[];
@@ -1391,7 +1415,7 @@ function prBoardFind(seed){const n=7;
               if(st.vis.t==="block"){if(G.some(g2=>!hasA(M,g2)&&!g2.cells.includes(c)&&openC(M,g2).length&&openC(M,g2).every(q=>sees(c,q))))alt.push(c)}
               else{const T2={cand:M.cand.slice(),placed:M.placed.slice()};mPlace(T2,c);if(propagateFails(T2,G))alt.push(c)}}
             if(alt.length)st.targets=alt}
-          got[ti]={m:m.slice(),st,g}}
+          prAlts(ti,st,M,G,m,n);got[ti]={m:m.slice(),st,g}}
         if(st.kind==="place"){mPlace(M,st.cell);m[st.cell]=2;for(let q=0;q<n*n;q++)if(m[q]!==2&&sees(st.cell,q))m[q]=1}
         else st.targets.forEach(k=>{M.cand[k]=false;m[k]=1})}
       return TRICKS.every((_,k)=>got[k])?got:null});
@@ -1401,7 +1425,7 @@ function prTrickLoad(newBoard,carry){if(!PR||!PR.tr)return;
   if(newBoard||!PR.board){if(newBoard)PR.tr.seed++;const bd=prBoardFind(PR.tr.seed);
     if(!bd){$("prMsg").innerHTML=`<span class="pri">🤔</span><div><b>${tr("No board found","หาด่านไม่เจอ")}</b><small>${tr("Tap New board to try again.","กด ด่านใหม่ เพื่อลองอีกครั้ง")}</small></div>`;return}
     PR.board=bd;PR.p=bd.p;PR.n=bd.n;PR.fin=[];PR.order=TRICKS.map((_,k)=>k).sort((a,b)=>bd.stages[a].g-bd.stages[b].g);PR.tr.i=PR.order[0];prBuild(bd.n,bd.p)}
-  const stg=PR.board.stages[PR.tr.i];PR.m=stg.m.slice();PR.stp=stg.st;PR.done=false;PR.guide=0;PR.miss=0;PR.msg="";PR.carry=!!carry&&PR.fin.some(Boolean);PR.last={k:-1,t:0};
+  const stg=PR.board.stages[PR.tr.i];PR.m=stg.m.slice();PR.stp=stg.st;PR.done=false;PR.guide=0;PR.miss=0;PR.fx=null;PR.tapped=-1;PR.msg="";PR.carry=!!carry&&PR.fin.some(Boolean);PR.last={k:-1,t:0};
   prTrickRender();prIdle()}
 /* no clue at first; a wrong tap or a long pause brings the guide in two steps: where to look, then the answer */
 function prIdle(){if(!PR||!PR.tr)return;clearTimeout(PR.t1);clearTimeout(PR.t2);const ref=PR;
@@ -1413,23 +1437,29 @@ function prTrickMiss(k,t){PR.miss++;const el=$("prBoard").children[k];el.classLi
 function prNope(k,t){const el=$("prBoard").children[k];el.classList.add("nope");setTimeout(()=>el.classList.remove("nope"),460);prNote("🙂 "+t)}
 function prTrickTap(k){if(!PR||!PR.tr||PR.done||!PR.stp)return;const{m,stp,p}=PR;if(m[k]!==0)return;
   if(stp.kind==="elim"){
-    if(stp.targets.includes(k)){stp.targets.forEach(q=>m[q]=1);PR.done=true;prTrickRender()}
+    if(stp.targets.includes(k)){PR.fx=TRICKS[PR.tr.i].id==="force"?prForce(k):null;stp.targets.forEach(q=>m[q]=1);PR.done=true;PR.tapped=k;prTrickRender()}
     else prTrickMiss(k,tr("Not quite: that cell isn't ruled out by this trick.","ยังไม่ใช่ ช่องนี้ไม่ได้ถูกตัดด้วยเทคนิคนี้"))}
   else{
-    if(k!==stp.cell){prTrickMiss(k,tr("Not quite: that isn't the last spot.","ยังไม่ใช่ ช่องนี้ไม่ใช่ช่องสุดท้าย"));PR.last={k:-1,t:0};return}
+    if(!(stp.cells||[stp.cell]).includes(k)){prTrickMiss(k,tr("Not quite: that isn't the last spot.","ยังไม่ใช่ ช่องนี้ไม่ใช่ช่องสุดท้าย"));PR.last={k:-1,t:0};return}
     const now=performance.now();
-    if(PR.last.k===k&&now-PR.last.t<350){m[k]=2;withP(p,()=>{for(let q=0;q<m.length;q++)if(m[q]!==2&&sees(k,q))m[q]=1});PR.done=true;prTrickRender()}
+    if(PR.last.k===k&&now-PR.last.t<350){PR.tapped=k;m[k]=2;withP(p,()=>{for(let q=0;q<m.length;q++)if(m[q]!==2&&sees(k,q))m[q]=1});PR.done=true;prTrickRender()}
     else{PR.last={k,t:now};prNote("👍 "+tr("Right spot! Now double-tap to place it.","ถูกช่องแล้ว! แตะ 2 ครั้งเพื่อวางตัว"))}}}
 function prTrickRender(){if(!PR||!PR.tr||!$("prBoard")||!PR.stp)return;const{m,stp,done}=PR,g2=PR.guide||0,T=TRICKS[PR.tr.i],cells=$("prBoard").children;
   const hintG=g2>=1||done;let any=false;
   [...cells].forEach((c,k)=>{c.classList.toggle("x",m[k]===1);c.classList.toggle("animal",m[k]===2);
     const inG=hintG&&stp.groups.some(g=>g.cells&&g.cells.includes(k)),isT=(done||g2>=2)&&(stp.kind==="place"?k===stp.cell:stp.targets.includes(k));
-    c.classList.toggle("grp",!!(inG||isT));c.classList.toggle("tgt",!!isT);if(inG||isT)any=true});
+    c.classList.toggle("grp",!!(inG||isT));c.classList.toggle("tgt",!!isT);if(inG||isT)any=true;
+    const fx=done&&PR.fx,chn=fx?PR.fx.chain.indexOf(k):-1,pre=fx&&PR.fx.c===k;
+    c.classList.toggle("ghost",!!(pre||chn>=0));c.classList.toggle("badg",!!(fx&&PR.fx.bad.cells.includes(k)));
+    if(pre)c.dataset.n="?";else if(chn>=0)c.dataset.n=chn+1;else delete c.dataset.n});
   $("prBoard").classList.toggle("focus",any&&!done);
   $("prMsg").innerHTML=`<span class="pri">${emo(T.ic)}</span><div><b>${tr(T.en,T.th)}</b><small>${tr(T.rule[0],T.rule[1])}</small></div>`;
-  $("prVis").innerHTML="";
+  const fx=done&&PR.fx;
+  $("prVis").innerHTML=fx?`<div class="fxsteps"><div>1. ${tr("Pretend a piece goes in the cell marked ?","สมมติว่าวางตัวในช่องที่มี ?")}</div>`
+    +(fx.chain.length?`<div>2. ${tr("That forces pieces in the numbered cells, in order.","ทำให้ต้องวางตัวในช่องที่มีเลข ตามลำดับ")}</div>`:"")
+    +`<div>${fx.chain.length?3:2}. ${tr(`Now the ${fx.name} (red) has no empty cell left. Impossible!`,`ตอนนี้${fx.name} (สีแดง) ไม่เหลือช่องว่างเลย เป็นไปไม่ได้!`)}</div><div>${fx.chain.length?4:3}. ${tr("So the pretend was wrong: this cell gets ✕.","แปลว่าสมมติผิด ช่องนี้จึงได้ ✕")}</div></div>`:"";
   if(done){clearTimeout(PR.t1);clearTimeout(PR.t2);PR.fin[PR.tr.i]=true}
-  prNote(done?"✅ "+tr("Why: ","เพราะ: ")+stp.text:PR.msg||(PR.carry?"➜ "+tr("Next trick on the same board. ","เทคนิคถัดไปบนกระดานเดิม "):"")+"👆 "+tr(T.task[0],T.task[1]));
+  prNote(done?(fx?"✅ "+tr("Follow the numbers on the board.","ดูตามตัวเลขบนกระดาน"):"✅ "+(stp.cellText&&stp.cellText[PR.tapped]?stp.cellText[PR.tapped]:(stp.targets0&&!stp.targets0.includes(PR.tapped)?tr("This cell works too. ","ช่องนี้ก็ถูกเหมือนกัน "):"")+tr("Why: ","เพราะ: ")+stp.text)):PR.msg||(PR.carry?"➜ "+tr("Next trick on the same board. ","เทคนิคถัดไปบนกระดานเดิม "):"")+"👆 "+tr(T.task[0],T.task[1]));
   $("prHelp").hidden=done;$("prNext").textContent=done&&PR.order.indexOf(PR.tr.i)<PR.order.length-1?"➜ "+tr("Next trick","เทคนิคถัดไป"):"🔄 "+tr("New board","ด่านใหม่");
   const pos=PR.order.indexOf(PR.tr.i);$("trPick").innerHTML=PR.order.map((ti,j)=>{const open=j===0||PR.fin[PR.order[j-1]];
     return`<button data-i="${ti}" class="${ti===PR.tr.i?"on":""}" ${open?"":"disabled"}>${PR.fin[ti]?"✓ ":open?"":"🔒 "}${j+1}. ${tr(TRICKS[ti].en,TRICKS[ti].th)}</button>`}).join("")}
@@ -1523,6 +1553,10 @@ function coachPlaced(){if(!coachStep)return;coachStep=0;store.set("coached",true
    Bumping one number resets the ones to its right (1.3.4 -> 1.4.0). Tag the commit too: git tag v1.4.0
    History: v2..v18 (Claude artifact era) became 0.2.0..0.18.0, and v19 (own website) became 1.0.0. ---------- */
 const CHANGELOG=[
+ {v:"1.4.1",date:"2026-11-12",items:[
+  ["🧠","Practice tricks accept every correct answer, not just one. What-if now shows the pretend piece, the forced pieces (numbered) and the colour that runs out of room.","เทคนิคในหน้าทดลองเล่นรับทุกคำตอบที่ถูก ไม่ใช่แค่ข้อเดียว และลองสมมติแสดงตัวที่สมมติ ตัวที่ถูกบังคับ (มีเลข) และสีที่ไม่เหลือที่"]]},
+ {v:"1.4.1",date:"2026-11-12",items:[
+  ["🧠","Practice tricks accept every correct answer, not just one. What-if now shows the pretend piece, the forced pieces (numbered) and the colour that runs out of room.","เทคนิคในหน้าทดลองเล่นรับทุกคำตอบที่ถูก ไม่ใช่แค่ข้อเดียว และลองสมมติแสดงตัวที่สมมติ ตัวที่ถูกบังคับ (มีเลข) และสีที่ไม่เหลือที่"]]},
  {v:"1.4.0",date:"2026-11-12",items:[
   ["🧠","All five practice tricks now play on one board, trick by trick in the order they come up. Finish one to unlock the next.","เทคนิคทั้ง 5 ข้อในหน้าทดลองเล่นเล่นบนกระดานเดียว ไล่ทีละข้อตามลำดับที่เจอ ทำข้อหนึ่งให้เสร็จเพื่อปลดล็อกข้อถัดไป"]]},
  {v:"1.3.5",date:"2026-11-12",items:[
