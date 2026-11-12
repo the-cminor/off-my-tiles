@@ -1516,7 +1516,7 @@ function showPractice(tab,ti){dockSide="left";const tk=tab==="tricks";
     <button class="big alt" id="prSkip">${tk?tr("Close","ปิด"):tr("Skip practice","ข้ามการทดลอง")}</button></div>`);
   $("ovCard").classList.add("practice");
   $("ovCard").querySelectorAll(".prtabs button").forEach(x=>x.onclick=()=>{if(!x.classList.contains("on"))showPractice(x.dataset.t)});
-  if(tk){$("prNext").onclick=()=>{if(PR.done)prTrickNext();else prTrickLoad(true)}}
+  if(tk){$("prNext").onclick=()=>{if(PR.done&&!PR.free)prTrickNext();else prTrickLoad(true)}}
   else prBuild(n,p);
   const b=$("prBoard");
   $("prClose").onclick=$("prSkip").onclick=()=>{PR=null;closeOv()};
@@ -1594,6 +1594,8 @@ function coachPlaced(){if(!coachStep)return;coachStep=0;store.set("coached",true
    Bumping one number resets the ones to its right (1.3.4 -> 1.4.0). Tag the commit too: git tag v1.4.0
    History: v2..v18 (Claude artifact era) became 0.2.0..0.18.0, and v19 (own website) became 1.0.0. ---------- */
 const CHANGELOG=[
+ {v:"1.6.1",date:"2026-11-12",items:[
+  ["🐞","Practice: New board works again after you reach the finish-the-board part.","หน้าทดลองเล่น: ปุ่มด่านใหม่ใช้ได้อีกครั้งหลังถึงช่วงทำกระดานให้จบ"]]},
  {v:"1.6.0",date:"2026-11-12",items:[
   ["🧠","Practice tricks now go in a fixed order on one empty board: Last spot, Line-up, Pairs, Trios, Blocker, What-if. Then you finish the board yourself. Drag works to ✕ many cells.","เทคนิคในหน้าทดลองเล่นเรียงตามลำดับบนกระดานว่างกระดานเดียว: ช่องสุดท้าย อยู่แนวเดียว จับคู่ จับสาม ตัวขวาง ลองสมมติ แล้วให้คุณทำกระดานให้จบเอง ลากเพื่อใส่ ✕ หลายช่องได้"]]},
  {v:"1.5.0",date:"2026-11-12",items:[
