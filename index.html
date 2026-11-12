@@ -1397,26 +1397,34 @@ function prTrickFind(ti,seed){const T=TRICKS[ti],n=T.n;
   return null}
 function prTrickLoad(bump){if(!PR||!PR.tr)return;if(bump)PR.tr.seed++;const f=prTrickFind(PR.tr.i,PR.tr.seed);
   if(!f){$("prMsg").innerHTML=`<span class="pri">🤔</span><div><b>${tr("No board found","หาด่านไม่เจอ")}</b><small>${tr("Tap New board to try again.","กด ด่านใหม่ เพื่อลองอีกครั้ง")}</small></div>`;return}
-  PR.p=f.p;PR.n=f.n;PR.m=f.m;PR.stp=f.step;PR.done=false;PR.reveal=false;PR.last={k:-1,t:0};prBuild(f.n,f.p);prTrickRender()}
+  PR.p=f.p;PR.n=f.n;PR.m=f.m;PR.stp=f.step;PR.done=false;PR.guide=0;PR.miss=0;PR.msg="";PR.last={k:-1,t:0};prBuild(f.n,f.p);prTrickRender();prIdle()}
+/* no clue at first; a wrong tap or a long pause brings the guide in two steps: where to look, then the answer */
+function prIdle(){if(!PR||!PR.tr)return;clearTimeout(PR.t1);clearTimeout(PR.t2);const ref=PR;
+  PR.t1=setTimeout(()=>{if(PR===ref&&!ref.done&&ref.guide<1){ref.guide=1;ref.msg="⏱ "+tr("Need a clue? The glowing cells show where to look.","ต้องการคำใบ้ไหม ช่องที่เรืองแสงคือที่ที่ต้องดู");prTrickRender()}},15000);
+  PR.t2=setTimeout(()=>{if(PR===ref&&!ref.done&&ref.guide<2){ref.guide=2;ref.msg="⏱ "+tr("Here is the answer. Tap the glowing cell.","นี่คือคำตอบ แตะช่องที่เรืองแสง");prTrickRender()}},35000)}
+function prTrickMiss(k,t){PR.miss++;const el=$("prBoard").children[k];el.classList.add("nope");setTimeout(()=>el.classList.remove("nope"),460);
+  PR.guide=Math.max(PR.guide,PR.miss>=2?2:1);
+  PR.msg="🙂 "+t+" "+(PR.guide>=2?tr("Here is the answer: tap the glowing cell.","นี่คือคำตอบ แตะช่องที่เรืองแสง"):tr("The glowing cells show where to look.","ช่องที่เรืองแสงคือที่ที่ต้องดู"));prTrickRender();prIdle()}
 function prNope(k,t){const el=$("prBoard").children[k];el.classList.add("nope");setTimeout(()=>el.classList.remove("nope"),460);prNote("🙂 "+t)}
 function prTrickTap(k){if(!PR||!PR.tr||PR.done||!PR.stp)return;const{m,stp,p}=PR;if(m[k]!==0)return;
   if(stp.kind==="elim"){
     if(stp.targets.includes(k)){stp.targets.forEach(q=>m[q]=1);PR.done=true;prTrickRender()}
-    else prNope(k,tr("Not a cell this trick rules out. Try another, or tap Show me.","ช่องนี้ยังไม่ใช่ตามเทคนิคนี้ ลองช่องอื่น หรือกด ช่วยชี้"))}
+    else prTrickMiss(k,tr("Not quite: that cell isn't ruled out by this trick.","ยังไม่ใช่ ช่องนี้ไม่ได้ถูกตัดด้วยเทคนิคนี้"))}
   else{
-    if(k!==stp.cell){prNope(k,tr("Not that spot.","ไม่ใช่ช่องนี้"));PR.last={k:-1,t:0};return}
+    if(k!==stp.cell){prTrickMiss(k,tr("Not quite: that isn't the last spot.","ยังไม่ใช่ ช่องนี้ไม่ใช่ช่องสุดท้าย"));PR.last={k:-1,t:0};return}
     const now=performance.now();
     if(PR.last.k===k&&now-PR.last.t<350){m[k]=2;withP(p,()=>{for(let q=0;q<m.length;q++)if(m[q]!==2&&sees(k,q))m[q]=1});PR.done=true;prTrickRender()}
     else{PR.last={k,t:now};prNote("👍 "+tr("Right spot! Now double-tap to place it.","ถูกช่องแล้ว! แตะ 2 ครั้งเพื่อวางตัว"))}}}
-function prTrickRender(){if(!PR||!PR.tr||!$("prBoard")||!PR.stp)return;const{m,stp,done,reveal}=PR,T=TRICKS[PR.tr.i],cells=$("prBoard").children;
-  const hintG=reveal||done||["single","line","group"].includes(T.id);let any=false;
+function prTrickRender(){if(!PR||!PR.tr||!$("prBoard")||!PR.stp)return;const{m,stp,done}=PR,g2=PR.guide||0,T=TRICKS[PR.tr.i],cells=$("prBoard").children;
+  const hintG=g2>=1||done||["single","line","group"].includes(T.id);let any=false;
   [...cells].forEach((c,k)=>{c.classList.toggle("x",m[k]===1);c.classList.toggle("animal",m[k]===2);
-    const inG=hintG&&stp.groups.some(g=>g.cells&&g.cells.includes(k)),isT=(done||reveal)&&(stp.kind==="place"?k===stp.cell:stp.targets.includes(k));
+    const inG=hintG&&stp.groups.some(g=>g.cells&&g.cells.includes(k)),isT=(done||g2>=2)&&(stp.kind==="place"?k===stp.cell:stp.targets.includes(k));
     c.classList.toggle("grp",!!(inG||isT));c.classList.toggle("tgt",!!isT);if(inG||isT)any=true});
   $("prBoard").classList.toggle("focus",any&&!done);
   $("prMsg").innerHTML=`<span class="pri">${emo(T.ic)}</span><div><b>${tr(T.en,T.th)}</b><small>${tr(T.rule[0],T.rule[1])}</small></div>`;
   $("prVis").innerHTML="";
-  prNote(done?"✅ "+tr("Why: ","เพราะ: ")+stp.text:"👆 "+tr(T.task[0],T.task[1]));
+  if(done){clearTimeout(PR.t1);clearTimeout(PR.t2)}
+  prNote(done?"✅ "+tr("Why: ","เพราะ: ")+stp.text:PR.msg||"👆 "+tr(T.task[0],T.task[1]));
   $("prHelp").hidden=done;$("prNext").textContent=(done?"➜ ":"🔄 ")+(done?tr("Next board","ด่านถัดไป"):tr("New board","ด่านใหม่"));
   $("trPick").querySelectorAll("button").forEach((b,i)=>b.classList.toggle("on",i===PR.tr.i))}
 function showPractice(tab,ti){dockSide="left";const tk=tab==="tricks";
@@ -1436,7 +1444,7 @@ function showPractice(tab,ti){dockSide="left";const tk=tab==="tricks";
   else prBuild(n,p);
   const b=$("prBoard");
   $("prClose").onclick=$("prSkip").onclick=()=>{PR=null;closeOv()};
-  $("prHelp").onclick=()=>{if(!PR)return;if(PR.tr){PR.reveal=true;prTrickRender();return}PR.help=prNextSol();prRender()};
+  $("prHelp").onclick=()=>{if(!PR)return;if(PR.tr){PR.guide=Math.min(2,(PR.guide||0)+1);PR.msg=PR.guide>=2?"💡 "+tr("Here is the answer. Tap the glowing cell.","นี่คือคำตอบ แตะช่องที่เรืองแสง"):"💡 "+tr("The glowing cells show where to look.","ช่องที่เรืองแสงคือที่ที่ต้องดู");prTrickRender();return}PR.help=prNextSol();prRender()};
   const kAt=e=>{const el=document.elementFromPoint(e.clientX,e.clientY);const c=el&&el.closest&&el.closest("#prBoard .cell");return c?+c.dataset.k:-1};
   b.addEventListener("pointerdown",e=>{if(!PR)return;const k=kAt(e);if(k<0)return;if(PR.tr){PR.drag={start:k};return}const m=PR.m[k];
     PR.drag={start:k,moved:false,paint:m===0?1:m===1?0:null,touched:new Set([k]),count:0};b.setPointerCapture?.(e.pointerId)});
@@ -1509,6 +1517,8 @@ function coachPlaced(){if(!coachStep)return;coachStep=0;store.set("coached",true
    Bumping one number resets the ones to its right (1.3.4 -> 1.4.0). Tag the commit too: git tag v1.4.0
    History: v2..v18 (Claude artifact era) became 0.2.0..0.18.0, and v19 (own website) became 1.0.0. ---------- */
 const CHANGELOG=[
+ {v:"1.3.4",date:"2026-11-12",items:[
+  ["🧠","Practice tricks now guide you: a wrong tap or a long pause tells you what to do, then lights up where to look, then shows the answer.","เทคนิคในหน้าทดลองเล่นมีตัวช่วยแล้ว: ถ้าแตะผิดหรือนิ่งนาน จะบอกว่าต้องทำอะไร ไฟเรืองแสงชี้ว่าให้ดูตรงไหน และถ้ายังไม่ได้จะเฉลยให้"]]},
  {v:"1.3.3",date:"2026-11-12",items:[
   ["🐞","Practice tricks: Blocker and What-if now accept any cell the rule really rules out, not just one.","เทคนิคในหน้าทดลองเล่น: ตัวขวางและลองสมมติ รับทุกช่องที่กฎนั้นตัดได้จริง ไม่ใช่แค่ช่องเดียว"]]},
  {v:"1.3.2",date:"2026-11-12",items:[
