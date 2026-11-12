@@ -133,6 +133,22 @@
         <button class="big alt" id="gOut">${tr("Sign out", "ออกจากระบบ")}</button>`;
       row.querySelector("#gOut").onclick = async () => { await client().auth.signOut().catch(() => {}); location.reload(); };
     }
+    // privacy policy + delete account (guests and Google players)
+    row.insertAdjacentHTML("beforeend", `<small class="seth"><a href="privacy.html" target="_blank" rel="noopener">${tr("Privacy policy", "นโยบายความเป็นส่วนตัว")}</a></small>
+      <button class="big danger" id="delAcct">${tr("Delete my account and data", "ลบบัญชีและข้อมูลของฉัน")}</button>
+      <small class="seth" id="delMsg"></small>`);
+    row.querySelector("#delAcct").onclick = async e => {
+      const msg = t => { row.querySelector("#delMsg").textContent = t; };
+      if (!confirm(tr("Delete your account, progress and leaderboard entries? This cannot be undone.", "ลบบัญชี ความคืบหน้า และรายการในอันดับของคุณ? ย้อนกลับไม่ได้"))) return;
+      if (!confirm(tr("Really delete everything?", "ลบทุกอย่างจริงๆ ใช่ไหม?"))) return;
+      e.target.disabled = true; msg(tr("Deleting…", "กำลังลบ…"));
+      const { error } = await client().rpc("delete_my_account");
+      if (error) { e.target.disabled = false; msg(tr("Couldn't delete. Try again.", "ลบไม่สำเร็จ ลองอีกครั้ง")); return; }
+      await client().auth.signOut().catch(() => {});
+      try { Object.keys(localStorage).filter(k => k.startsWith("zoo_") || k === "omt_auth").forEach(k => localStorage.removeItem(k)); } catch (err) {}
+      msg(tr("Deleted. Reloading…", "ลบแล้ว กำลังโหลดใหม่…"));
+      setTimeout(() => location.reload(), 1000);
+    };
   };
 
   const user = {
