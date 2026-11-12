@@ -198,6 +198,7 @@ header{width:100%;display:grid;grid-template-columns:86px 1fr 86px;align-items:c
 .trpick button.on{background:var(--accent);color:#fff;border-color:var(--accent)}
 .prvis{margin:6px 0 2px;min-height:0}
 .cell.nope{animation:shake .45s}
+.prboard.focus .cell{opacity:.62}.prboard.focus .cell.grp{opacity:1}
 
 .tool .badge.state{background:var(--good)}
 .tool.off .badge.state{background:var(--muted)}
@@ -1405,7 +1406,7 @@ function prTrickRender(){if(!PR||!PR.tr||!$("prBoard")||!PR.stp)return;const{m,s
   [...cells].forEach((c,k)=>{c.classList.toggle("x",m[k]===1);c.classList.toggle("animal",m[k]===2);
     const inG=hintG&&stp.groups.some(g=>g.cells&&g.cells.includes(k)),isT=(done||reveal)&&(stp.kind==="place"?k===stp.cell:stp.targets.includes(k));
     c.classList.toggle("grp",!!(inG||isT));c.classList.toggle("tgt",!!isT);if(inG||isT)any=true});
-  $("prBoard").classList.toggle("focus",any);
+  $("prBoard").classList.toggle("focus",any&&!done);
   $("prMsg").innerHTML=`<span class="pri">${emo(T.ic)}</span><div><b>${tr(T.en,T.th)}</b><small>${tr(T.rule[0],T.rule[1])}</small></div>`;
   $("prVis").innerHTML=done?emo(withP(PR.p,()=>visHTML(stp))):"";
   prNote(done?"✅ "+stp.text:"👆 "+tr(T.task[0],T.task[1]));
@@ -1503,6 +1504,8 @@ function coachPlaced(){if(!coachStep)return;coachStep=0;store.set("coached",true
 const CHANGELOG=[
   {v:"1.3.0",date:"2026-11-12",items:[
    ["🔒","New privacy policy, and Settings → Account now has Delete my account and data.","มีนโยบายความเป็นส่วนตัว และในตั้งค่า → บัญชี มีปุ่มลบบัญชีและข้อมูลของฉัน"]]},
+ {v:"1.3.1",date:"2026-11-12",items:[
+  ["🧠","Practice tricks: the board colours stay bright. Only the cells to look at stand out, and nothing is dimmed once you find the answer.","เทคนิคในหน้าทดลองเล่น: สีกระดานสว่างขึ้น ช่องที่ต้องดูเด่นขึ้น และเมื่อตอบถูกแล้วจะไม่มีการหรี่สีอีก"]]},
  {v:"1.2.0",date:"2026-11-12",items:[
   ["👤","New Profile in the ☰ menu: set your name once, and the leaderboard and Daily use it. The name box is gone from the leaderboard.","มีโปรไฟล์ในเมนู ☰ ตั้งชื่อที่เดียว กระดานอันดับและรายวันใช้ชื่อนี้ ช่องตั้งชื่อในกระดานอันดับถูกเอาออกแล้ว"],
   ["✏️","Draft mode: tap ✏️ under the board to try ideas in pencil. It doesn't touch your hearts, hints or save. Use Put on board to make it real, or Clear draft.","โหมดร่าง: กด ✏️ ใต้กระดานเพื่อลองคิดด้วยดินสอ ไม่กระทบหัวใจ คำใบ้ หรือเซฟ กด ลงกระดานจริง เพื่อใช้ หรือ ล้างร่าง"],
