@@ -1391,17 +1391,17 @@ function prBoardFind(seed){const n=7;
               if(st.vis.t==="block"){if(G.some(g2=>!hasA(M,g2)&&!g2.cells.includes(c)&&openC(M,g2).length&&openC(M,g2).every(q=>sees(c,q))))alt.push(c)}
               else{const T2={cand:M.cand.slice(),placed:M.placed.slice()};mPlace(T2,c);if(propagateFails(T2,G))alt.push(c)}}
             if(alt.length)st.targets=alt}
-          got[ti]={m:m.slice(),st}}
+          got[ti]={m:m.slice(),st,g}}
         if(st.kind==="place"){mPlace(M,st.cell);m[st.cell]=2;for(let q=0;q<n*n;q++)if(m[q]!==2&&sees(st.cell,q))m[q]=1}
         else st.targets.forEach(k=>{M.cand[k]=false;m[k]=1})}
       return TRICKS.every((_,k)=>got[k])?got:null});
     if(r)return{p,n,stages:r}}
   return null}
-function prTrickLoad(newBoard){if(!PR||!PR.tr)return;
+function prTrickLoad(newBoard,carry){if(!PR||!PR.tr)return;
   if(newBoard||!PR.board){if(newBoard)PR.tr.seed++;const bd=prBoardFind(PR.tr.seed);
     if(!bd){$("prMsg").innerHTML=`<span class="pri">🤔</span><div><b>${tr("No board found","หาด่านไม่เจอ")}</b><small>${tr("Tap New board to try again.","กด ด่านใหม่ เพื่อลองอีกครั้ง")}</small></div>`;return}
-    PR.board=bd;PR.p=bd.p;PR.n=bd.n;PR.fin=[];if(newBoard)PR.tr.i=0;prBuild(bd.n,bd.p)}
-  const stg=PR.board.stages[PR.tr.i];PR.m=stg.m.slice();PR.stp=stg.st;PR.done=false;PR.guide=0;PR.miss=0;PR.msg="";PR.last={k:-1,t:0};
+    PR.board=bd;PR.p=bd.p;PR.n=bd.n;PR.fin=[];PR.order=TRICKS.map((_,k)=>k).sort((a,b)=>bd.stages[a].g-bd.stages[b].g);PR.tr.i=PR.order[0];prBuild(bd.n,bd.p)}
+  const stg=PR.board.stages[PR.tr.i];PR.m=stg.m.slice();PR.stp=stg.st;PR.done=false;PR.guide=0;PR.miss=0;PR.msg="";PR.carry=!!carry&&PR.fin.some(Boolean);PR.last={k:-1,t:0};
   prTrickRender();prIdle()}
 /* no clue at first; a wrong tap or a long pause brings the guide in two steps: where to look, then the answer */
 function prIdle(){if(!PR||!PR.tr)return;clearTimeout(PR.t1);clearTimeout(PR.t2);const ref=PR;
@@ -1429,15 +1429,16 @@ function prTrickRender(){if(!PR||!PR.tr||!$("prBoard")||!PR.stp)return;const{m,s
   $("prMsg").innerHTML=`<span class="pri">${emo(T.ic)}</span><div><b>${tr(T.en,T.th)}</b><small>${tr(T.rule[0],T.rule[1])}</small></div>`;
   $("prVis").innerHTML="";
   if(done){clearTimeout(PR.t1);clearTimeout(PR.t2);PR.fin[PR.tr.i]=true}
-  prNote(done?"✅ "+tr("Why: ","เพราะ: ")+stp.text:PR.msg||"👆 "+tr(T.task[0],T.task[1]));
-  $("prHelp").hidden=done;$("prNext").textContent=done&&PR.tr.i<TRICKS.length-1?"➜ "+tr("Next trick","เทคนิคถัดไป"):"🔄 "+tr("New board","ด่านใหม่");
-  $("trPick").querySelectorAll("button").forEach((b,i)=>{b.classList.toggle("on",i===PR.tr.i);b.textContent=(PR.fin[i]?"✓ ":"")+tr(TRICKS[i].en,TRICKS[i].th)})}
+  prNote(done?"✅ "+tr("Why: ","เพราะ: ")+stp.text:PR.msg||(PR.carry?"➜ "+tr("Next trick on the same board. ","เทคนิคถัดไปบนกระดานเดิม "):"")+"👆 "+tr(T.task[0],T.task[1]));
+  $("prHelp").hidden=done;$("prNext").textContent=done&&PR.order.indexOf(PR.tr.i)<PR.order.length-1?"➜ "+tr("Next trick","เทคนิคถัดไป"):"🔄 "+tr("New board","ด่านใหม่");
+  const pos=PR.order.indexOf(PR.tr.i);$("trPick").innerHTML=PR.order.map((ti,j)=>{const open=j===0||PR.fin[PR.order[j-1]];
+    return`<button data-i="${ti}" class="${ti===PR.tr.i?"on":""}" ${open?"":"disabled"}>${PR.fin[ti]?"✓ ":open?"":"🔒 "}${j+1}. ${tr(TRICKS[ti].en,TRICKS[ti].th)}</button>`}).join("")}
 function showPractice(tab,ti){dockSide="left";const tk=tab==="tricks";
   const p=generateN(5,rng(20261107)),n=5;
   PR=tk?{tr:{i:ti||0,seed:0},drag:null,last:{k:-1,t:0},m:[],step:0}:{p,n,m:new Array(n*n).fill(0),step:1,placed:0,target:-1,drag:null,last:{k:-1,t:0},glow:[],help:-1,hist:[]};
   overlay(`<div class="prhead"><h2>🎓 ${tr("Practice","ทดลองเล่น")}</h2><button class="prx" id="prClose" aria-label="Close">✕</button></div>
     <div class="langpick prtabs" role="group"><button data-t="moves" class="${tk?"":"on"}">${tr("Moves","วิธีเล่น")}</button><button data-t="tricks" class="${tk?"on":""}">🧠 ${tr("Tricks","เทคนิค")}</button></div>
-    ${tk?`<div class="trpick" id="trPick">${TRICKS.map((t,i)=>`<button data-i="${i}">${tr(t.en,t.th)}</button>`).join("")}</div>`:'<div class="prdots" id="prDots"></div>'}
+    ${tk?`<div class="trpick" id="trPick"></div>`:'<div class="prdots" id="prDots"></div>'}
     <div class="prmsg" id="prMsg"></div>
     <div class="board prboard" id="prBoard"></div>${tk?'<div class="prvis vis" id="prVis"></div>':""}<div class="prnote" id="prNote"></div>
     <div class="prbtns"><button class="big alt" id="prHelp" hidden>💡 ${tr("Show me","ช่วยชี้")}</button>
@@ -1445,7 +1446,7 @@ function showPractice(tab,ti){dockSide="left";const tk=tab==="tricks";
     <button class="big alt" id="prSkip">${tk?tr("Close","ปิด"):tr("Skip practice","ข้ามการทดลอง")}</button></div>`);
   $("ovCard").classList.add("practice");
   $("ovCard").querySelectorAll(".prtabs button").forEach(x=>x.onclick=()=>{if(!x.classList.contains("on"))showPractice(x.dataset.t)});
-  if(tk){$("trPick").querySelectorAll("button").forEach(x=>x.onclick=()=>{PR.tr.i=+x.dataset.i;prTrickLoad()});$("prNext").onclick=()=>{if(PR.done&&PR.tr.i<TRICKS.length-1){PR.tr.i++;prTrickLoad()}else prTrickLoad(true)}}
+  if(tk){$("trPick").onclick=e=>{const x=e.target.closest("button");if(!x||x.disabled)return;PR.tr.i=+x.dataset.i;prTrickLoad(false,true)};$("prNext").onclick=()=>{const pos=PR.order.indexOf(PR.tr.i);if(PR.done&&pos<PR.order.length-1){PR.tr.i=PR.order[pos+1];prTrickLoad(false,true)}else prTrickLoad(true)}}
   else prBuild(n,p);
   const b=$("prBoard");
   $("prClose").onclick=$("prSkip").onclick=()=>{PR=null;closeOv()};
@@ -1523,7 +1524,7 @@ function coachPlaced(){if(!coachStep)return;coachStep=0;store.set("coached",true
    History: v2..v18 (Claude artifact era) became 0.2.0..0.18.0, and v19 (own website) became 1.0.0. ---------- */
 const CHANGELOG=[
  {v:"1.4.0",date:"2026-11-12",items:[
-  ["🧠","All five practice tricks now use one board. Move through them in order with Next trick, or jump to any trick. Finished ones get a ✓.","เทคนิคทั้ง 5 ข้อในหน้าทดลองเล่นใช้กระดานเดียวกัน กดเทคนิคถัดไปเพื่อไล่ตามลำดับ หรือเลือกข้อไหนก็ได้ ข้อที่ทำแล้วมีเครื่องหมาย ✓"]]},
+  ["🧠","All five practice tricks now play on one board, trick by trick in the order they come up. Finish one to unlock the next.","เทคนิคทั้ง 5 ข้อในหน้าทดลองเล่นเล่นบนกระดานเดียว ไล่ทีละข้อตามลำดับที่เจอ ทำข้อหนึ่งให้เสร็จเพื่อปลดล็อกข้อถัดไป"]]},
  {v:"1.3.5",date:"2026-11-12",items:[
   ["🧠","Practice tricks start with the board in plain colours: no bright or dark cells until you need the guide.","เทคนิคในหน้าทดลองเล่นเริ่มด้วยกระดานสีปกติ ไม่มีช่องสว่างหรือมืด จนกว่าจะต้องใช้ตัวช่วย"]]},
  {v:"1.3.4",date:"2026-11-12",items:[
