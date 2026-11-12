@@ -1379,25 +1379,30 @@ function withP(p,fn){const sv=P;P=p;try{return fn()}finally{P=sv}}
 function prBuild(n,p){const b=$("prBoard"),pc=pxE(curTheme().pieces[0]),fs=Math.floor(296/n*0.62);b.innerHTML="";b.classList.remove("focus");b.style.gridTemplateColumns=`repeat(${n},1fr)`;
   for(let k=0;k<n*n;k++){const d=document.createElement("div");d.className="cell";d.dataset.k=k;d.innerHTML=XSVG+`<span class="a" style="font-size:${fs}px">${pc}</span>`;
     const col=palNow[p.reg[k]%palNow.length];d.style.background=col;d.style.setProperty("--cellx",xColorFor(col));b.appendChild(d)}}
-function prTrickFind(ti,seed){const T=TRICKS[ti],n=T.n;
-  for(let i=0;i<150;i++){const p=generateN(n,rng(77000+ti*1000+seed*131+i));p.n=n;p.animal=curTheme().pieces[0];
-    const r=withP(p,()=>{const G=buildGroups(),M={cand:new Array(n*n).fill(true),placed:new Array(n*n).fill(false)},m=new Array(n*n).fill(0);
-      for(let g=0;g<300;g++){const st=nextRule(M,G);if(!st)return null;
-        if(T.test(st)&&(st.kind==="place"||st.targets.length)){
-          if(st.kind==="elim"&&(st.vis.t==="block"||st.vis.t==="force")){ // every cell the same rule rules out counts, not just the first one found
+/* one board for all five tricks: find a 7×7 where the hint engine meets every trick, and remember the board as it stands at each one */
+function prBoardFind(seed){const n=7;
+  for(let i=0;i<3000;i++){const p=generateN(n,rng(88000+seed*7919+i));p.n=n;p.animal=curTheme().pieces[0];
+    const r=withP(p,()=>{const G=buildGroups(),M={cand:new Array(n*n).fill(true),placed:new Array(n*n).fill(false)},m=new Array(n*n).fill(0),got=[];
+      for(let g=0;g<300&&got.filter(Boolean).length<TRICKS.length;g++){const st=nextRule(M,G);if(!st)break;
+        const ti=TRICKS.findIndex(T=>T.test(st));
+        if(ti>=0&&!got[ti]&&(st.kind==="place"||st.targets.length)){
+          if(st.kind==="elim"&&(st.vis.t==="block"||st.vis.t==="force")){ // every cell the same rule rules out counts
             const alt=[];for(let c=0;c<n*n;c++){if(!M.cand[c]||m[c]!==0)continue;
-              if(st.vis.t==="block"){if(G.some(g=>!hasA(M,g)&&!g.cells.includes(c)&&openC(M,g).length&&openC(M,g).every(q=>sees(c,q))))alt.push(c)}
+              if(st.vis.t==="block"){if(G.some(g2=>!hasA(M,g2)&&!g2.cells.includes(c)&&openC(M,g2).length&&openC(M,g2).every(q=>sees(c,q))))alt.push(c)}
               else{const T2={cand:M.cand.slice(),placed:M.placed.slice()};mPlace(T2,c);if(propagateFails(T2,G))alt.push(c)}}
             if(alt.length)st.targets=alt}
-          return{m,st}}
+          got[ti]={m:m.slice(),st}}
         if(st.kind==="place"){mPlace(M,st.cell);m[st.cell]=2;for(let q=0;q<n*n;q++)if(m[q]!==2&&sees(st.cell,q))m[q]=1}
         else st.targets.forEach(k=>{M.cand[k]=false;m[k]=1})}
-      return null});
-    if(r)return{p,n,m:r.m,step:r.st}}
+      return TRICKS.every((_,k)=>got[k])?got:null});
+    if(r)return{p,n,stages:r}}
   return null}
-function prTrickLoad(bump){if(!PR||!PR.tr)return;if(bump)PR.tr.seed++;const f=prTrickFind(PR.tr.i,PR.tr.seed);
-  if(!f){$("prMsg").innerHTML=`<span class="pri">🤔</span><div><b>${tr("No board found","หาด่านไม่เจอ")}</b><small>${tr("Tap New board to try again.","กด ด่านใหม่ เพื่อลองอีกครั้ง")}</small></div>`;return}
-  PR.p=f.p;PR.n=f.n;PR.m=f.m;PR.stp=f.step;PR.done=false;PR.guide=0;PR.miss=0;PR.msg="";PR.last={k:-1,t:0};prBuild(f.n,f.p);prTrickRender();prIdle()}
+function prTrickLoad(newBoard){if(!PR||!PR.tr)return;
+  if(newBoard||!PR.board){if(newBoard)PR.tr.seed++;const bd=prBoardFind(PR.tr.seed);
+    if(!bd){$("prMsg").innerHTML=`<span class="pri">🤔</span><div><b>${tr("No board found","หาด่านไม่เจอ")}</b><small>${tr("Tap New board to try again.","กด ด่านใหม่ เพื่อลองอีกครั้ง")}</small></div>`;return}
+    PR.board=bd;PR.p=bd.p;PR.n=bd.n;PR.fin=[];if(newBoard)PR.tr.i=0;prBuild(bd.n,bd.p)}
+  const stg=PR.board.stages[PR.tr.i];PR.m=stg.m.slice();PR.stp=stg.st;PR.done=false;PR.guide=0;PR.miss=0;PR.msg="";PR.last={k:-1,t:0};
+  prTrickRender();prIdle()}
 /* no clue at first; a wrong tap or a long pause brings the guide in two steps: where to look, then the answer */
 function prIdle(){if(!PR||!PR.tr)return;clearTimeout(PR.t1);clearTimeout(PR.t2);const ref=PR;
   PR.t1=setTimeout(()=>{if(PR===ref&&!ref.done&&ref.guide<1){ref.guide=1;ref.msg="⏱ "+tr("Need a clue? The glowing cells show where to look.","ต้องการคำใบ้ไหม ช่องที่เรืองแสงคือที่ที่ต้องดู");prTrickRender()}},15000);
@@ -1423,10 +1428,10 @@ function prTrickRender(){if(!PR||!PR.tr||!$("prBoard")||!PR.stp)return;const{m,s
   $("prBoard").classList.toggle("focus",any&&!done);
   $("prMsg").innerHTML=`<span class="pri">${emo(T.ic)}</span><div><b>${tr(T.en,T.th)}</b><small>${tr(T.rule[0],T.rule[1])}</small></div>`;
   $("prVis").innerHTML="";
-  if(done){clearTimeout(PR.t1);clearTimeout(PR.t2)}
+  if(done){clearTimeout(PR.t1);clearTimeout(PR.t2);PR.fin[PR.tr.i]=true}
   prNote(done?"✅ "+tr("Why: ","เพราะ: ")+stp.text:PR.msg||"👆 "+tr(T.task[0],T.task[1]));
-  $("prHelp").hidden=done;$("prNext").textContent=(done?"➜ ":"🔄 ")+(done?tr("Next board","ด่านถัดไป"):tr("New board","ด่านใหม่"));
-  $("trPick").querySelectorAll("button").forEach((b,i)=>b.classList.toggle("on",i===PR.tr.i))}
+  $("prHelp").hidden=done;$("prNext").textContent=done&&PR.tr.i<TRICKS.length-1?"➜ "+tr("Next trick","เทคนิคถัดไป"):"🔄 "+tr("New board","ด่านใหม่");
+  $("trPick").querySelectorAll("button").forEach((b,i)=>{b.classList.toggle("on",i===PR.tr.i);b.textContent=(PR.fin[i]?"✓ ":"")+tr(TRICKS[i].en,TRICKS[i].th)})}
 function showPractice(tab,ti){dockSide="left";const tk=tab==="tricks";
   const p=generateN(5,rng(20261107)),n=5;
   PR=tk?{tr:{i:ti||0,seed:0},drag:null,last:{k:-1,t:0},m:[],step:0}:{p,n,m:new Array(n*n).fill(0),step:1,placed:0,target:-1,drag:null,last:{k:-1,t:0},glow:[],help:-1,hist:[]};
@@ -1440,7 +1445,7 @@ function showPractice(tab,ti){dockSide="left";const tk=tab==="tricks";
     <button class="big alt" id="prSkip">${tk?tr("Close","ปิด"):tr("Skip practice","ข้ามการทดลอง")}</button></div>`);
   $("ovCard").classList.add("practice");
   $("ovCard").querySelectorAll(".prtabs button").forEach(x=>x.onclick=()=>{if(!x.classList.contains("on"))showPractice(x.dataset.t)});
-  if(tk){$("trPick").querySelectorAll("button").forEach(x=>x.onclick=()=>{PR.tr.i=+x.dataset.i;PR.tr.seed=0;prTrickLoad()});$("prNext").onclick=()=>prTrickLoad(true)}
+  if(tk){$("trPick").querySelectorAll("button").forEach(x=>x.onclick=()=>{PR.tr.i=+x.dataset.i;prTrickLoad()});$("prNext").onclick=()=>{if(PR.done&&PR.tr.i<TRICKS.length-1){PR.tr.i++;prTrickLoad()}else prTrickLoad(true)}}
   else prBuild(n,p);
   const b=$("prBoard");
   $("prClose").onclick=$("prSkip").onclick=()=>{PR=null;closeOv()};
@@ -1517,6 +1522,8 @@ function coachPlaced(){if(!coachStep)return;coachStep=0;store.set("coached",true
    Bumping one number resets the ones to its right (1.3.4 -> 1.4.0). Tag the commit too: git tag v1.4.0
    History: v2..v18 (Claude artifact era) became 0.2.0..0.18.0, and v19 (own website) became 1.0.0. ---------- */
 const CHANGELOG=[
+ {v:"1.4.0",date:"2026-11-12",items:[
+  ["🧠","All five practice tricks now use one board. Move through them in order with Next trick, or jump to any trick. Finished ones get a ✓.","เทคนิคทั้ง 5 ข้อในหน้าทดลองเล่นใช้กระดานเดียวกัน กดเทคนิคถัดไปเพื่อไล่ตามลำดับ หรือเลือกข้อไหนก็ได้ ข้อที่ทำแล้วมีเครื่องหมาย ✓"]]},
  {v:"1.3.5",date:"2026-11-12",items:[
   ["🧠","Practice tricks start with the board in plain colours: no bright or dark cells until you need the guide.","เทคนิคในหน้าทดลองเล่นเริ่มด้วยกระดานสีปกติ ไม่มีช่องสว่างหรือมืด จนกว่าจะต้องใช้ตัวช่วย"]]},
  {v:"1.3.4",date:"2026-11-12",items:[
