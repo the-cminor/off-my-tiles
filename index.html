@@ -1424,7 +1424,8 @@ function prBoardFind(seed){const n=7;
 function prTrickLoad(newBoard,carry){if(!PR||!PR.tr)return;
   if(newBoard||!PR.board){if(newBoard)PR.tr.seed++;const bd=prBoardFind(PR.tr.seed);
     if(!bd){$("prMsg").innerHTML=`<span class="pri">🤔</span><div><b>${tr("No board found","หาด่านไม่เจอ")}</b><small>${tr("Tap New board to try again.","กด ด่านใหม่ เพื่อลองอีกครั้ง")}</small></div>`;return}
-    PR.board=bd;PR.p=bd.p;PR.n=bd.n;PR.fin=[];PR.order=TRICKS.map((_,k)=>k).sort((a,b)=>bd.stages[a].g-bd.stages[b].g);PR.tr.i=PR.order[0];prBuild(bd.n,bd.p)}
+    PR.board=bd;PR.p=bd.p;PR.n=bd.n;PR.fin=[];PR.order=TRICKS.map((_,k)=>k); // easy to hard
+    PR.tr.i=PR.order[0];prBuild(bd.n,bd.p)}
   const stg=PR.board.stages[PR.tr.i];PR.m=stg.m.slice();PR.stp=stg.st;PR.done=false;PR.guide=0;PR.miss=0;PR.fx=null;PR.tapped=-1;PR.msg="";PR.carry=!!carry&&PR.fin.some(Boolean);PR.last={k:-1,t:0};
   prTrickRender();prIdle()}
 /* no clue at first; a wrong tap or a long pause brings the guide in two steps: where to look, then the answer */
@@ -1437,12 +1438,12 @@ function prTrickMiss(k,t){PR.miss++;const el=$("prBoard").children[k];el.classLi
 function prNope(k,t){const el=$("prBoard").children[k];el.classList.add("nope");setTimeout(()=>el.classList.remove("nope"),460);prNote("🙂 "+t)}
 function prTrickTap(k){if(!PR||!PR.tr||PR.done||!PR.stp)return;const{m,stp,p}=PR;if(m[k]!==0)return;
   if(stp.kind==="elim"){
-    if(stp.targets.includes(k)){PR.fx=TRICKS[PR.tr.i].id==="force"?prForce(k):null;stp.targets.forEach(q=>m[q]=1);PR.done=true;PR.tapped=k;prTrickRender()}
+    if(stp.targets.includes(k)){PR.fx=TRICKS[PR.tr.i].id==="force"?prForce(k):null;m[k]=1;PR.done=true;PR.tapped=k;prTrickRender()}
     else prTrickMiss(k,tr("Not quite: that cell isn't ruled out by this trick.","ยังไม่ใช่ ช่องนี้ไม่ได้ถูกตัดด้วยเทคนิคนี้"))}
   else{
     if(!(stp.cells||[stp.cell]).includes(k)){prTrickMiss(k,tr("Not quite: that isn't the last spot.","ยังไม่ใช่ ช่องนี้ไม่ใช่ช่องสุดท้าย"));PR.last={k:-1,t:0};return}
     const now=performance.now();
-    if(PR.last.k===k&&now-PR.last.t<350){PR.tapped=k;m[k]=2;withP(p,()=>{for(let q=0;q<m.length;q++)if(m[q]!==2&&sees(k,q))m[q]=1});PR.done=true;prTrickRender()}
+    if(PR.last.k===k&&now-PR.last.t<350){PR.tapped=k;m[k]=2;PR.done=true;prTrickRender()}
     else{PR.last={k,t:now};prNote("👍 "+tr("Right spot! Now double-tap to place it.","ถูกช่องแล้ว! แตะ 2 ครั้งเพื่อวางตัว"))}}}
 function prTrickRender(){if(!PR||!PR.tr||!$("prBoard")||!PR.stp)return;const{m,stp,done}=PR,g2=PR.guide||0,T=TRICKS[PR.tr.i],cells=$("prBoard").children;
   const hintG=g2>=1||done;let any=false;
@@ -1553,6 +1554,8 @@ function coachPlaced(){if(!coachStep)return;coachStep=0;store.set("coached",true
    Bumping one number resets the ones to its right (1.3.4 -> 1.4.0). Tag the commit too: git tag v1.4.0
    History: v2..v18 (Claude artifact era) became 0.2.0..0.18.0, and v19 (own website) became 1.0.0. ---------- */
 const CHANGELOG=[
+ {v:"1.4.2",date:"2026-11-12",items:[
+  ["🧠","Practice tricks go from easy to hard on one board, and nothing is filled in for you: you mark the cell yourself.","เทคนิคในหน้าทดลองเล่นเรียงจากง่ายไปยากบนกระดานเดียว และไม่มีการเติมให้อัตโนมัติ ผู้เล่นใส่เครื่องหมายเอง"]]},
  {v:"1.4.1",date:"2026-11-12",items:[
   ["🧠","Practice tricks accept every correct answer, not just one. What-if now shows the pretend piece, the forced pieces (numbered) and the colour that runs out of room.","เทคนิคในหน้าทดลองเล่นรับทุกคำตอบที่ถูก ไม่ใช่แค่ข้อเดียว และลองสมมติแสดงตัวที่สมมติ ตัวที่ถูกบังคับ (มีเลข) และสีที่ไม่เหลือที่"]]},
  {v:"1.4.1",date:"2026-11-12",items:[
