@@ -1416,7 +1416,7 @@ function prTrickTap(k){if(!PR||!PR.tr||PR.done||!PR.stp)return;const{m,stp,p}=PR
     if(PR.last.k===k&&now-PR.last.t<350){m[k]=2;withP(p,()=>{for(let q=0;q<m.length;q++)if(m[q]!==2&&sees(k,q))m[q]=1});PR.done=true;prTrickRender()}
     else{PR.last={k,t:now};prNote("👍 "+tr("Right spot! Now double-tap to place it.","ถูกช่องแล้ว! แตะ 2 ครั้งเพื่อวางตัว"))}}}
 function prTrickRender(){if(!PR||!PR.tr||!$("prBoard")||!PR.stp)return;const{m,stp,done}=PR,g2=PR.guide||0,T=TRICKS[PR.tr.i],cells=$("prBoard").children;
-  const hintG=g2>=1||done||["single","line","group"].includes(T.id);let any=false;
+  const hintG=g2>=1||done;let any=false;
   [...cells].forEach((c,k)=>{c.classList.toggle("x",m[k]===1);c.classList.toggle("animal",m[k]===2);
     const inG=hintG&&stp.groups.some(g=>g.cells&&g.cells.includes(k)),isT=(done||g2>=2)&&(stp.kind==="place"?k===stp.cell:stp.targets.includes(k));
     c.classList.toggle("grp",!!(inG||isT));c.classList.toggle("tgt",!!isT);if(inG||isT)any=true});
@@ -1517,6 +1517,8 @@ function coachPlaced(){if(!coachStep)return;coachStep=0;store.set("coached",true
    Bumping one number resets the ones to its right (1.3.4 -> 1.4.0). Tag the commit too: git tag v1.4.0
    History: v2..v18 (Claude artifact era) became 0.2.0..0.18.0, and v19 (own website) became 1.0.0. ---------- */
 const CHANGELOG=[
+ {v:"1.3.5",date:"2026-11-12",items:[
+  ["🧠","Practice tricks start with the board in plain colours: no bright or dark cells until you need the guide.","เทคนิคในหน้าทดลองเล่นเริ่มด้วยกระดานสีปกติ ไม่มีช่องสว่างหรือมืด จนกว่าจะต้องใช้ตัวช่วย"]]},
  {v:"1.3.4",date:"2026-11-12",items:[
   ["🧠","Practice tricks now guide you: a wrong tap or a long pause tells you what to do, then lights up where to look, then shows the answer.","เทคนิคในหน้าทดลองเล่นมีตัวช่วยแล้ว: ถ้าแตะผิดหรือนิ่งนาน จะบอกว่าต้องทำอะไร ไฟเรืองแสงชี้ว่าให้ดูตรงไหน และถ้ายังไม่ได้จะเฉลยให้"]]},
  {v:"1.3.3",date:"2026-11-12",items:[
