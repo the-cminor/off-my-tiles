@@ -32,3 +32,7 @@ To release:
 2. Commit, then tag it: `git tag v1.1.0 && git push --tags`
 
 History: v2–v18 (the Claude artifact versions) are now `0.2.0`–`0.18.0`, and v19 (the game's own website) is `1.0.0`.
+
+## License
+
+© 2026 Cin. All rights reserved. The code is public to view, but may not be copied, hosted or reused without permission. See [LICENSE](LICENSE).
