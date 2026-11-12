@@ -196,7 +196,8 @@ header{width:100%;display:grid;grid-template-columns:86px 1fr 86px;align-items:c
 .trpick button{grid-column:span 2;border:2px solid var(--bg2);background:var(--bg);color:var(--ink);font:800 13px var(--body);padding:8px 4px;border-radius:0;cursor:pointer}
 .trpick button:nth-child(n+4){grid-column:span 3}
 .trpick button.on{background:var(--accent);color:#fff;border-color:var(--accent)}
-.prvis{margin:6px 0 2px;min-height:0}
+.prvis{margin:0;min-height:0}
+.practice .prmsg small{font-size:14px;line-height:1.35}.practice .prnote{font-size:15px;line-height:1.4;color:var(--ink);padding:6px 2px;min-height:48px}
 .cell.nope{animation:shake .45s}
 .prboard.focus .cell{opacity:.62}.prboard.focus .cell.grp{opacity:1}
 
@@ -1360,20 +1361,20 @@ let PR=null;
 /* logic tricks: each lesson loads a real board, plays the game's own hint engine up to a step of that kind, and asks the player to find it */
 const TRICKS=[
  {id:"single",n:5,ic:"🎯",en:"Last spot",th:"ช่องสุดท้าย",
-  rule:["An area, row or column with just one open cell left: its piece has to go there.","โซน แถว หรือคอลัมน์ที่เหลือช่องว่างช่องเดียว ตัวต้องวางตรงนั้น"],
-  task:["Double-tap the spot where a piece must go.","แตะ 2 ครั้งที่ช่องซึ่งต้องวางตัว"],test:st=>st.kind==="place"&&st.vis.t==="single"},
+  rule:["Only one empty cell left in a colour, row or column? Its piece has to go there.", "สี แถว หรือคอลัมน์ไหนเหลือช่องว่างช่องเดียว ตัวต้องวางตรงนั้น"],
+  task:["Look at the bright colour. Which empty cell is its last one? Double-tap it.", "ดูสีที่สว่างอยู่ ช่องว่างสุดท้ายของสีนั้นคือช่องไหน แตะ 2 ครั้งเลย"],test:st=>st.kind==="place"&&st.vis.t==="single"},
  {id:"line",n:6,ic:"🧱",en:"Line-up",th:"อยู่แนวเดียว",
-  rule:["If all the open cells of one colour sit in one row or column, that colour's piece is in that line. Every other cell of the line gets ✕.","ถ้าช่องว่างทั้งหมดของสีหนึ่งอยู่แถวหรือคอลัมน์เดียว ตัวของสีนั้นต้องอยู่ในแนวนั้น ช่องอื่นในแนวนั้นจึงได้ ✕"],
-  task:["Tap a cell that can't hold a piece to ✕ it.","แตะช่องที่วางตัวไม่ได้เพื่อใส่ ✕"],test:st=>st.vis.t==="confine"&&st.vis.src.length===1},
+  rule:["All empty cells of a colour in one line? Then that line's piece belongs to this colour, so ✕ the rest of the line.", "ช่องว่างของสีหนึ่งอยู่ในแนวเดียวกันหมด? ตัวของแนวนั้นต้องเป็นสีนี้ ดังนั้นใส่ ✕ ช่องอื่นในแนวนั้น"],
+  task:["Look at the bright cells. Tap a cell in that line that is a different colour.", "ดูช่องที่สว่าง แล้วแตะช่องสีอื่นในแนวนั้นเพื่อใส่ ✕"],test:st=>st.vis.t==="confine"&&st.vis.src.length===1},
  {id:"group",n:7,ic:"👯",en:"Pairs & trios",th:"จับกลุ่ม",
-  rule:["Two (or three) colours that only fit inside the same two (or three) lines use up all the pieces there. Everything else in those lines gets ✕.","ถ้า 2 (หรือ 3) สีมีที่ว่างอยู่แค่ใน 2 (หรือ 3) แถวหรือคอลัมน์เดียวกัน ตัวจะถูกใช้หมดในนั้น ช่องอื่นในแนวเหล่านั้นจึงได้ ✕"],
-  task:["Tap a cell that can't hold a piece to ✕ it.","แตะช่องที่วางตัวไม่ได้เพื่อใส่ ✕"],test:st=>st.vis.t==="confine"&&st.vis.src.length>=2},
+  rule:["Two colours squeezed into the same two lines? They use up both lines, so ✕ everything else in those lines.", "สองสีอยู่ในสองแนวเดียวกันหมด? ตัวจะถูกใช้หมดในสองแนวนั้น ใส่ ✕ ช่องอื่นทั้งหมดในสองแนวนั้น"],
+  task:["Look at the bright cells. Tap a cell in those lines that belongs to another colour.", "ดูช่องที่สว่าง แล้วแตะช่องสีอื่นในแนวเหล่านั้นเพื่อใส่ ✕"],test:st=>st.vis.t==="confine"&&st.vis.src.length>=2},
  {id:"block",n:6,ic:"🚧",en:"Blocker",th:"ตัวขวาง",
-  rule:["If a piece here would leave a colour, row or column with no open cell, this cell can't hold a piece.","ถ้าวางตัวตรงนี้แล้วทำให้สี แถว หรือคอลัมน์ใดไม่เหลือช่องว่าง ช่องนี้ก็วางไม่ได้"],
-  task:["Find a cell that would block a whole area, and ✕ it.","หาช่องที่ถ้าวางจะบล็อกทั้งโซน แล้วใส่ ✕"],test:st=>st.vis.t==="block"},
+  rule:["Would a piece here leave a colour with no empty cell? Then this cell can't hold a piece, so ✕ it.", "ถ้าวางตัวตรงนี้แล้วมีสีไหนไม่เหลือช่องว่าง ช่องนี้ก็วางไม่ได้ ใส่ ✕"],
+  task:["Pick a cell, imagine a piece there. Does it block a whole colour? Tap it.", "เลือกช่อง แล้วลองนึกว่าวางตัวตรงนั้น ถ้าบล็อกสีทั้งสีได้ ให้แตะช่องนั้น"],test:st=>st.vis.t==="block"},
  {id:"force",n:7,ic:"🔮",en:"What-if",th:"ลองสมมติ",
-  rule:["Pretend a piece is here and follow the forced moves. If some area ends with no room, the pretend was wrong: ✕.","สมมติว่าวางตัวตรงนี้ แล้วไล่ตามที่ถูกบังคับ ถ้าจบด้วยโซนไม่เหลือที่ แปลว่าสมมติผิด ใส่ ✕"],
-  task:["Find the cell that fails the what-if, and ✕ it.","หาช่องที่สมมติแล้วล้มเหลว แล้วใส่ ✕"],test:st=>st.vis.t==="force"}];
+  rule:["Pretend a piece is here. If that forces moves until a colour has no room, the pretend was wrong, so ✕.", "ลองสมมติว่าวางตัวตรงนี้ ถ้าต้องวางต่อเรื่อยๆ จนมีสีหนึ่งไม่เหลือที่ แปลว่าสมมติผิด ใส่ ✕"],
+  task:["Hardest one. Try a cell, follow what it forces. Tap the one that fails. Stuck? Tap 💡.", "ข้อยากสุด ลองช่องหนึ่งแล้วไล่ดูว่าบังคับอะไรต่อ แตะช่องที่ล้มเหลว ติดแล้วกด 💡"],test:st=>st.vis.t==="force"}];
 function withP(p,fn){const sv=P;P=p;try{return fn()}finally{P=sv}}
 function prBuild(n,p){const b=$("prBoard"),pc=pxE(curTheme().pieces[0]),fs=Math.floor(296/n*0.62);b.innerHTML="";b.classList.remove("focus");b.style.gridTemplateColumns=`repeat(${n},1fr)`;
   for(let k=0;k<n*n;k++){const d=document.createElement("div");d.className="cell";d.dataset.k=k;d.innerHTML=XSVG+`<span class="a" style="font-size:${fs}px">${pc}</span>`;
@@ -1408,8 +1409,8 @@ function prTrickRender(){if(!PR||!PR.tr||!$("prBoard")||!PR.stp)return;const{m,s
     c.classList.toggle("grp",!!(inG||isT));c.classList.toggle("tgt",!!isT);if(inG||isT)any=true});
   $("prBoard").classList.toggle("focus",any&&!done);
   $("prMsg").innerHTML=`<span class="pri">${emo(T.ic)}</span><div><b>${tr(T.en,T.th)}</b><small>${tr(T.rule[0],T.rule[1])}</small></div>`;
-  $("prVis").innerHTML=done?emo(withP(PR.p,()=>visHTML(stp))):"";
-  prNote(done?"✅ "+stp.text:"👆 "+tr(T.task[0],T.task[1]));
+  $("prVis").innerHTML="";
+  prNote(done?"✅ "+tr("Why: ","เพราะ: ")+stp.text:"👆 "+tr(T.task[0],T.task[1]));
   $("prHelp").hidden=done;$("prNext").textContent=(done?"➜ ":"🔄 ")+(done?tr("Next board","ด่านถัดไป"):tr("New board","ด่านใหม่"));
   $("trPick").querySelectorAll("button").forEach((b,i)=>b.classList.toggle("on",i===PR.tr.i))}
 function showPractice(tab,ti){dockSide="left";const tk=tab==="tricks";
@@ -1502,6 +1503,8 @@ function coachPlaced(){if(!coachStep)return;coachStep=0;store.set("coached",true
    Bumping one number resets the ones to its right (1.3.4 -> 1.4.0). Tag the commit too: git tag v1.4.0
    History: v2..v18 (Claude artifact era) became 0.2.0..0.18.0, and v19 (own website) became 1.0.0. ---------- */
 const CHANGELOG=[
+ {v:"1.3.2",date:"2026-11-12",items:[
+  ["🧠","Practice tricks use plainer words: each rule is one short sentence, with a clear step to do, and a simple \"Why\" once you find it.","เทคนิคในหน้าทดลองเล่นใช้คำง่ายขึ้น แต่ละกฎเป็นประโยคสั้นๆ มีขั้นตอนให้ทำชัดเจน และบอกเหตุผลสั้นๆ เมื่อหาเจอ"]]},
  {v:"1.3.1",date:"2026-11-12",items:[
   ["🧠","Practice tricks: the board colours stay bright. Only the cells to look at stand out, and nothing is dimmed once you find the answer.","เทคนิคในหน้าทดลองเล่น: สีกระดานสว่างขึ้น ช่องที่ต้องดูเด่นขึ้น และเมื่อตอบถูกแล้วจะไม่มีการหรี่สีอีก"]]},
   {v:"1.3.0",date:"2026-11-12",items:[
