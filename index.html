@@ -174,6 +174,31 @@ header{width:100%;display:grid;grid-template-columns:86px 1fr 86px;align-items:c
 .rewards span.soon{background:transparent;color:var(--muted);border:1.5px dashed var(--muted)}
 .tool{position:relative;width:60px;height:62px;border-radius:16px;border:0;background:var(--panel);color:var(--ink);box-shadow:var(--shadow);cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0;font:800 10px var(--body);letter-spacing:.6px;text-transform:uppercase}
 .tool .i{font-size:24px;line-height:1.1}
+/* draft mode, profile and practice tricks (v1.2.0) */
+.tools{gap:5px}.tool{width:54px}
+.tool.on{box-shadow:0 0 0 3px #7c3aed,var(--shadow)}
+.board.drafting{outline:3px dashed #7c3aed;outline-offset:4px}
+.cell .dr{position:absolute;inset:0;display:none;place-items:center;pointer-events:none;line-height:1}
+.board.drafting .cell .dr{display:grid}
+.cell .dr .dx{font:900 .85em var(--body);color:#7c3aed;text-shadow:0 0 2px #fff}
+.cell .dr .dx.imp{opacity:.4}
+.cell .dr svg.pxe{width:1.25em;height:1.25em;opacity:.75}
+.cell.d2{outline:3px dashed #7c3aed;outline-offset:-4px}
+.cell.dc{outline-color:#e11d48}
+.draftbar{display:flex;flex-direction:column;gap:6px;align-items:center;margin-top:10px;padding:10px 12px;background:var(--panel);box-shadow:var(--shadow);border:2px dashed #7c3aed}
+.draftbar[hidden]{display:none}
+.draftbar small{font:700 12px/1.3 var(--body);color:var(--muted);text-align:center}
+.draftbar .db{display:flex;gap:8px;width:100%}
+.draftbar .db button{flex:1;border:0;padding:9px 6px;font:800 14px var(--body);cursor:pointer;background:var(--bg);color:var(--ink)}
+.draftbar .db button.go{background:#7c3aed;color:#fff}
+.prtabs{margin:8px 0 2px}
+.trpick{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;margin:8px 0 2px}
+.trpick button{grid-column:span 2;border:2px solid var(--bg2);background:var(--bg);color:var(--ink);font:800 13px var(--body);padding:8px 4px;border-radius:0;cursor:pointer}
+.trpick button:nth-child(n+4){grid-column:span 3}
+.trpick button.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+.prvis{margin:6px 0 2px;min-height:0}
+.cell.nope{animation:shake .45s}
+
 .tool .badge.state{background:var(--good)}
 .tool.off .badge.state{background:var(--muted)}
 .tool.off .i{filter:grayscale(1);opacity:.5}
@@ -521,8 +546,10 @@ html,body{overscroll-behavior:none}
     <button class="tool" id="crossBtn" aria-label="Cross hint: mark one cell"><span class="i">❌</span><span id="tlCross">Cross</span><span class="badge" id="cxCount">0</span></button>
     <button class="tool" id="animalBtn" aria-label="Place hint: place one piece"><span class="i" id="placeIcon">🐧</span><span id="tlPlace">Place</span><span class="badge" id="anCount">0</span></button>
     <button class="tool" id="clearBtn"><span class="i">🧽</span><span id="tlClear">Clear</span></button>
+    <button class="tool" id="draftBtn" aria-pressed="false" aria-label="Draft mode"><span class="i">✏️</span><span id="tlDraft">Draft</span></button>
     <button class="tool" id="autoBtn" aria-pressed="true" aria-label="Auto-fill pieces"><span class="i">✨</span><span id="tlAuto">Auto</span><span class="badge state" id="autoState">ON</span></button>
   </div>
+  <div class="draftbar" id="draftBar" hidden><small id="dTxt"></small><div class="db"><button class="go" id="dPut"></button><button id="dClear"></button></div></div>
   <div class="gest" id="helpText"></div>
 </div></div>
 
@@ -715,6 +742,7 @@ function tierIdx(){return Math.min(streak,TIERS.length-1)}
 function renderStack(bump){const st=$("streakTag");st.innerHTML=streak>0?emo(tr(`🔥 ${streak} win streak`,`🔥 ชนะติดกัน ${streak}`)):"";st.hidden=streak<=0;
   st.classList.remove("bump");if(bump&&streak>0){void st.offsetWidth;st.classList.add("bump")}$("tiers").innerHTML=TIERS.map((m,i)=>`<span class="tier ${i<tierIdx()?"done":""} ${i===tierIdx()?"on":""} ${bump&&i===tierIdx()?"bump":""}">X${m}</span>`).join("");$("score").innerHTML=emo("⭐ "+score.toLocaleString()+(saveDenied?" ⚠️":cloud?" ☁️":""));$("score").title=saveDenied?tr("Progress can't be saved to your account","บันทึกความคืบหน้าลงบัญชีไม่ได้"):cloud?tr("Progress saved to your account","บันทึกลงบัญชีแล้ว"):tr("Progress saved in this browser","บันทึกไว้ในเบราว์เซอร์นี้")}
 function resetStreak(){if(streak>0){streak=0;store.set("streak",0);renderStack();saveCloud()}}
+let draftOn=false,draft=[];
 let P=null, marks=[], lives=MAX_LIVES, placed=0, combo=0, mistakes=0, history=[], busy=false, usedHint=false, pickMode=false;
 /* auto-fill: once every open cell left is an animal spot, place them all */
 let autoFilling=false,autoOn=store.get("autoFill",true);
@@ -776,12 +804,12 @@ function startLevel(){
     if(!store.get("coached",false)&&level===1&&mode==="main"&&$("ov").hidden&&!coachStep)setTimeout(startCoach,400)},30);
 }
 function setup(){
-  const n=P.n;marks=new Array(n*n).fill(0);lives=MAX_LIVES;placed=0;combo=0;mistakes=0;history=[];usedHint=false;pickMode=false;autoFilling=false;board.classList.remove("picking");renderStack();
+  const n=P.n;marks=new Array(n*n).fill(0);lives=MAX_LIVES;placed=0;combo=0;mistakes=0;history=[];usedHint=false;pickMode=false;autoFilling=false;board.classList.remove("picking");renderStack();draft=new Array(n*n).fill(0);draftOn=false;board.classList.remove("drafting");
   renderTitle();
   board.style.gridTemplateColumns=`repeat(${n},1fr)`;board.innerHTML="";$("hintSheet").hidden=true;$("helpText").hidden=false;board.classList.remove("focus");
   const fs=Math.floor(Math.min(board.clientWidth||400,460)/n*0.62);
-  for(let k=0;k<n*n;k++){const d=document.createElement("div");d.className="cell";d.dataset.k=k;    d.innerHTML=XSVG+`<span class="a" style="font-size:${fs}px"></span>`;board.appendChild(d)}
-  applyTheme();renderGest();
+  for(let k=0;k<n*n;k++){const d=document.createElement("div");d.className="cell";d.dataset.k=k;    d.innerHTML=XSVG+`<span class="a" style="font-size:${fs}px"></span><span class="dr" style="font-size:${fs}px"></span>`;board.appendChild(d)}
+  applyTheme();renderGest();renderDraft();
   renderLives();renderStrip();updateTools();if(fitted)fit();if(coachStep)setTimeout(showCoach,50);
 }
 function cellEl(k){return board.children[k]}
@@ -831,18 +859,51 @@ function showCombo(){const w=(lang==="th"?WORDS_TH:WORDS)[Math.min(combo,WORDS.l
 function locked(k){if(!P)return false;const n=P.n,y=k/n|0,x=k%n;
   for(let q=0;q<n*n;q++){if(marks[q]!==2||q===k)continue;const yy=q/n|0,xx=q%n;
     if(yy===y||xx===x||P.reg[q]===P.reg[k]||(Math.abs(yy-y)<=1&&Math.abs(xx-x)<=1))return true}return false}
+/* ---------- ✏️ draft mode: try ideas on a pencil layer. Nothing here touches hearts, hints, stars or the saved game ---------- */
+function dSees(a,b){return sees(a,b)}
+function renderDraft(){const b=$("draftBtn");if(!b)return;b.classList.toggle("on",draftOn);b.setAttribute("aria-pressed",String(draftOn));
+  const bar=$("draftBar");bar.hidden=!draftOn;$("helpText").hidden=draftOn||(!!$("hintSheet")&&!$("hintSheet").hidden);
+  if(!P||!draft.length)return;const n=P.n,pcs=[],pc=pxE(P.animal);draft.forEach((v,k)=>{if(v===2)pcs.push(k)});
+  const nPieces=pcs.length,any=draft.some(v=>v);
+  [...board.children].forEach((c,k)=>{const dr=c.querySelector(".dr");if(!dr)return;
+    const piece=draft[k]===2,cross=draft[k]===1,imp=!piece&&!cross&&marks[k]===0&&pcs.some(q=>dSees(q,k));
+    const bad=piece&&pcs.some(q=>q!==k&&dSees(q,k));
+    c.classList.toggle("d2",piece&&draftOn);c.classList.toggle("dc",bad&&draftOn);
+    dr.innerHTML=!draftOn?"":piece?pc:cross?'<b class="dx">✕</b>':imp?'<b class="dx imp">✕</b>':""});
+  if(draftOn){$("dTxt").textContent=nPieces?tr("✏️ Draft. Your real game isn't affected. Red outline = two draft pieces clash. Wrong pieces cost a heart when you put them on the board.","✏️ ร่าง ไม่กระทบเกมจริง กรอบแดง = ตัวร่างสองตัวชนกัน ถ้าวางลงกระดานจริงแล้วผิดจะเสียหัวใจ")
+      :tr("✏️ Draft. Tap = ✕, double-tap = piece. Your real game isn't affected.","✏️ ร่าง แตะ = ✕ แตะ 2 ครั้ง = วางตัว ไม่กระทบเกมจริง");
+    $("dPut").textContent=tr("Put on board","ลงกระดานจริง");$("dClear").textContent=tr("Clear draft","ล้างร่าง");$("dPut").disabled=$("dClear").disabled=!any}}
+function setDraft(k,v){if(marks[k]!==0||draft[k]===v)return false;draft[k]=v;return true}
+let dDrag=null,dLast={k:-1,t:0};
+function dDown(e){const k=kFromPoint(e.clientX,e.clientY);if(k<0)return;
+  dDrag={start:k,moved:false,paint:draft[k]===0?1:draft[k]===1?0:null,touched:new Set([k])};board.setPointerCapture?.(e.pointerId)}
+function dMove(e){if(!dDrag||dDrag.paint===null)return;const k=kFromPoint(e.clientX,e.clientY);if(k<0||dDrag.touched.has(k))return;
+  if(!dDrag.moved){dDrag.moved=true;setDraft(dDrag.start,dDrag.paint)}dDrag.touched.add(k);setDraft(k,dDrag.paint);renderDraft()}
+function dUp(){const d=dDrag;dDrag=null;if(!d)return;if(d.moved){renderDraft();return}
+  const k=d.start;if(marks[k]!==0){dLast={k:-1,t:0};return}const now=performance.now();
+  if(dLast.k===k&&now-dLast.t<350){draft[k]=draft[k]===2?0:2;dLast={k:-1,t:0}}
+  else{dLast={k,t:now,prev:draft[k]};draft[k]=draft[k]===0?1:0}
+  renderDraft()}
+$("draftBtn").onclick=()=>{if(!P||busy)return;clearFocus();draftOn=!draftOn;board.classList.toggle("drafting",draftOn);dDrag=null;renderDraft()};
+$("dClear").onclick=()=>{draft.fill(0);renderDraft()};
+$("dPut").onclick=()=>{if(!P||!draftOn||lives<=0)return;const cur=P,n=P.n;
+  const xs=[],ps=[];draft.forEach((v,k)=>{if(v===1)xs.push(k);else if(v===2)ps.push(k)});
+  xs.forEach(k=>{if(marks[k]===0&&!locked(k))setMark(k,1)});
+  draft.fill(0);draftOn=false;board.classList.remove("drafting");renderDraft();updateTools();
+  ps.forEach((k,i)=>setTimeout(()=>{if(P===cur&&marks[k]===0&&lives>0&&!busy)placeAnimal(k);updateTools()},300+i*750))};
 /* ---------- input: tap toggles ✕, double-tap places animal, drag marks ✕ ---------- */
 let drag=null, lastTap={k:-1,t:0};
 function kFromPoint(x,y){const el=document.elementFromPoint(x,y);const c=el&&el.closest&&el.closest(".cell");return c?+c.dataset.k:-1}
 board.addEventListener("pointerdown",e=>{if(busy||lives<=0)return;
+  if(draftOn){dDown(e);return}
   if(pickMode){const k=kFromPoint(e.clientX,e.clientY);if(k>=0)doSweep(k);return}
   clearHighlight();const k=kFromPoint(e.clientX,e.clientY);if(k<0)return;
   drag={start:k,moved:false,paint:marks[k]===0?1:(marks[k]===1?0:null),touched:new Set([k])};board.setPointerCapture?.(e.pointerId)});
-board.addEventListener("pointermove",e=>{if(!drag)return;const k=kFromPoint(e.clientX,e.clientY);if(k<0||drag.touched.has(k))return;
+board.addEventListener("pointermove",e=>{if(draftOn){dMove(e);return}if(!drag)return;const k=kFromPoint(e.clientX,e.clientY);if(k<0||drag.touched.has(k))return;
   if(drag.paint===null)return;
   if(!drag.moved){drag.moved=true;if(marks[drag.start]!==2&&!(drag.paint===0&&locked(drag.start)))setMark(drag.start,drag.paint)}
   drag.touched.add(k);if(marks[k]!==2&&!(drag.paint===0&&locked(k)))setMark(k,drag.paint);updateTools()});
-window.addEventListener("pointerup",()=>{if(!drag)return;const d=drag;drag=null;if(d.moved){checkAutoFill();return}const k=d.start;
+window.addEventListener("pointerup",()=>{if(draftOn||dDrag){dUp();return}if(!drag)return;const d=drag;drag=null;if(d.moved){checkAutoFill();return}const k=d.start;
   if(marks[k]===2||lives<=0)return; // a correct animal is locked in
   if(marks[k]===1&&locked(k)){lastTap={k:-1,t:0};return} // ruled out by a placed piece: keep the ✕
   const now=performance.now();
@@ -943,7 +1004,7 @@ function doSweep(k){const n=P.n,g=P.reg[k],name=COLOR_NAMES[g],cells=[];for(let 
   showHint({kind:"elim",newT:targets,groups:[{cells}],title:`Swept the ${name} area`,
     text:`${targets.length} cell${targets.length>1?"s":""} in the ${name} area can't hold its animal and now ${targets.length>1?"have":"has"} ✕. Its animal goes in the one cell still open there. Double-tap it to place it.`})}
 function clearHighlight(){board.classList.remove("focus");board.querySelectorAll(".grp,.tgt").forEach(e=>e.classList.remove("grp","tgt"))}
-function clearFocus(){pickMode=false;board.classList.remove("picking");clearHighlight();lastHint=null;$("hintSheet").hidden=true;$("helpText").hidden=false;placeSheet()}
+function clearFocus(){pickMode=false;board.classList.remove("picking");clearHighlight();lastHint=null;$("hintSheet").hidden=true;$("helpText").hidden=draftOn;placeSheet()}
 /* ---------- visual hints: a picture sentence (colour / row / column chips → piece / ✕) with tiny captions; words folded away ---------- */
 let lastHint=null;
 const tok=(v,cap,cls="")=>`<span class="tok ${cls}"><span class="tv">${v}</span><small>${cap}</small></span>`;
@@ -1076,7 +1137,7 @@ let boardTab="goat";
 function showBoard(tab){dockSide="left";boardTab=tab||boardTab||"goat";const g=boardTab==="goat";
   /* leaderboard as in the Retro 8-bit design (3.6 G.O.A.T. and 3.7 Daily): header + close, two tabs, podium or ranked list */
   const tabs=`<div class="lbtabs" role="tablist"><button data-t="goat" role="tab" aria-selected="${g}" class="${g?"on":""}">G.O.A.T.</button><button data-t="daily" role="tab" aria-selected="${!g}" class="${g?"":"on"}">${tr("Daily","รายวัน")}</button></div>`;
-  const name=`<div class="nickrow lbname"><label for="nickIn">${tr("Your name","ชื่อของคุณ")}</label><input id="nickIn" maxlength="16" autocomplete="nickname" placeholder="${tr("Pick a name","ตั้งชื่อ")}"><button id="nickSave">${tr("Save","บันทึก")}</button></div>`;
+  const name=nick?"":`<button class="big alt" id="lbProf">👤 ${tr("Set your name in Profile","ตั้งชื่อในโปรไฟล์")}</button>`;
   overlay(g?`<div class="gsub">${tr("Greatest of all time","ที่สุดตลอดกาล")}</div>
     <h2 class="gtitle">🐐 G.O.A.T.</h2>
     ${tabs}${name}
@@ -1091,12 +1152,9 @@ function showBoard(tab){dockSide="left";boardTab=tab||boardTab||"goat";const g=b
     <p class="lbnote" id="boardNote"></p>
     <button class="big lbplay" id="lbPlay">${tr("Play today's puzzle","เล่นด่านวันนี้")}</button>
     ${name}`);
-  $("ovCard").classList.add("lbcard",g?"lbgoat":"lbdaily");boardOpen=true;$("nickIn").value=nick;boardNoteLock=false;
+  $("ovCard").classList.add("lbcard",g?"lbgoat":"lbdaily");boardOpen=true;boardNoteLock=false;
   $("ovCard").querySelectorAll(".lbtabs button").forEach(b=>b.onclick=()=>showBoard(b.dataset.t));
-  const save=()=>{const v=$("nickIn").value.trim().slice(0,16);nick=v;store.set("nick",nick);clearTimeout(cloudTimer);flushCloud();
-    if(daily.done&&dailyCol&&myId&&daily.date===dayKey())dailyCol.doc(myId).update({name:nick}).catch(()=>{});
-    boardNoteLock=true;$("boardNote").textContent=v?tr(`Saved. You'll show as "${v}".`,`บันทึกแล้ว จะแสดงเป็น "${v}"`):tr("Name cleared. You'll show as Player.","ลบชื่อแล้ว จะแสดงเป็น ผู้เล่น")};
-  $("nickSave").onclick=save;$("nickIn").onkeydown=e=>{if(e.key==="Enter"){e.preventDefault();save()}};
+  if($("lbProf"))$("lbProf").onclick=showProfile;
   $("lbDone").onclick=closeOv;
   if(!g){freshDaily();const pl=$("lbPlay");if(daily.done||mode!=="main")pl.hidden=true;else pl.onclick=()=>{closeOv();enterDaily()};lbClock()}
   renderBoard()}
@@ -1249,22 +1307,34 @@ function showHelp(){dockSide="left";const pc=pxE(P?P.animal:"🦊");
       ${more("🎨",tr("Themes:","ธีม:"),tr("Clear levels 10, 20, 30… to unlock new pieces and colours.","ผ่านเลเวล 10, 20, 30… เพื่อปลดล็อกตัวหมากและสีใหม่"))}
       ${more("📅",tr("Daily:","รายวัน:"),tr("Same timed 9×9 for everyone. +30 s per mistake.","ด่าน 9×9 เดียวกันทุกคน จับเวลา วางผิด +30 วิ"))}
       ${more("🎉",tr("Festivals:","เทศกาล:"),tr("Beat a very hard puzzle to use its theme that month.","ผ่านด่านยากมากเพื่อใช้ธีมนั้นตลอดเดือน"))}
-      ${more("🐐",tr("G.O.A.T.:","G.O.A.T.:"),tr("All-time ranking. Set your name in 🏆. Whoever is #1 gets the G.O.A.T. theme.","อันดับตลอดกาล ตั้งชื่อได้ที่ 🏆 คนที่เป็นอันดับ 1 ได้ใช้ธีม G.O.A.T."))}
+      ${more("🐐",tr("G.O.A.T.:","G.O.A.T.:"),tr("All-time ranking. Set your name in ☰ Menu › Profile. Whoever is #1 gets the G.O.A.T. theme.","อันดับตลอดกาล ตั้งชื่อได้ที่ ☰ เมนู › โปรไฟล์ คนที่เป็นอันดับ 1 ได้ใช้ธีม G.O.A.T."))}
     </ul></details>
     <button class="big alt" id="menuBack">← ${tr("Menu","เมนู")}</button>`);
   $("ovCard").querySelectorAll(".langpick button").forEach(b=>b.onclick=()=>{setLang(b.dataset.l);showHelp()});
   $("okBtn").onclick=()=>{closeOv();startCoach()};$("menuBack").onclick=showMenu}
+/* ---------- profile: the player's name lives here only (leaderboard and Daily read it) ---------- */
+function saveNick(v){v=String(v||"").trim().slice(0,16);nick=v;store.set("nick",nick);clearTimeout(cloudTimer);flushCloud();
+  if(daily.done&&dailyCol&&myId&&daily.date===dayKey())dailyCol.doc(myId).update({name:nick}).catch(()=>{});return v}
+function showProfile(){dockSide="left";
+  overlay(`<h2>👤 ${tr("Profile","โปรไฟล์")}</h2>
+    <div class="setrow"><div class="nickrow"><label for="nickIn">${tr("Your name","ชื่อของคุณ")}</label><input id="nickIn" maxlength="16" autocomplete="nickname" placeholder="${tr("Pick a name","ตั้งชื่อ")}"><button id="nickSave">${tr("Save","บันทึก")}</button></div>
+      <small class="seth" id="profNote">${tr("Shown on the 🏆 leaderboard and Daily. More profile features will land here.","แสดงบนกระดานอันดับ 🏆 และรายวัน ฟีเจอร์โปรไฟล์อื่นจะมาอยู่ที่นี่")}</small></div>
+    <button class="big alt" id="menuBack">← ${tr("Menu","เมนู")}</button>`);
+  $("nickIn").value=nick;
+  const save=()=>{const v=saveNick($("nickIn").value);$("profNote").textContent=v?tr(`Saved. You'll show as "${v}".`,`บันทึกแล้ว จะแสดงเป็น "${v}"`):tr("Name cleared. You'll show as Player.","ลบชื่อแล้ว จะแสดงเป็น ผู้เล่น")};
+  $("nickSave").onclick=save;$("nickIn").onkeydown=e=>{if(e.key==="Enter"){e.preventDefault();save()}};$("menuBack").onclick=showMenu}
 function showMenu(){dockSide="left";const isNew=isNewer(LATEST_VER,seenVer());
   const it=(id,ico,t,s)=>`<button class="mitem" id="${id}"><span class="mico">${ico}</span><span class="mtx"><b>${t}</b><small>${s}</small></span>${id==="mNews"&&isNew?'<i class="mdot" aria-label="new"></i>':""}<span class="mgo" aria-hidden="true">›</span></button>`;
   noX=true;overlay(`<h2>${tr("Menu","เมนู")}</h2>
     <div class="mlist">
+      ${it("mProf","👤",tr("Profile","โปรไฟล์"),tr("Your name","ชื่อของคุณ"))}
       ${it("mHow","📖",tr("How to play","วิธีเล่น"),tr("Rules, taps and language","กติกา วิธีแตะ และภาษา"))}
       ${it("mSet","⚙️",tr("Settings","ตั้งค่า"),tr("Day or night, language, start over","กลางวัน/กลางคืน ภาษา เริ่มใหม่"))}
       ${it("mNews","🆕",tr("What's new","มีอะไรใหม่"),tr("Latest changes to the game","การอัปเดตล่าสุดของเกม"))}
-      ${it("mPrac","🎓",tr("Practice board","ทดลองเล่น"),tr("Try the moves on a small board","ลองเล่นบนกระดานเล็ก"))}
+      ${it("mPrac","🎓",tr("Practice board","ทดลองเล่น"),tr("Try the moves and logic tricks","ลองวิธีเล่นและเทคนิคตรรกะ"))}
     </div>
     <button class="big" id="menuDone">${tr("Close","ปิด")}</button>`);
-  $("mHow").onclick=showHelp;$("mSet").onclick=showSettings;$("mNews").onclick=()=>showNews(true);$("mPrac").onclick=showPractice;$("menuDone").onclick=closeOv}
+  $("mProf").onclick=showProfile;$("mHow").onclick=showHelp;$("mSet").onclick=showSettings;$("mNews").onclick=()=>showNews(true);$("mPrac").onclick=showPractice;$("menuDone").onclick=closeOv}
 function showSettings(){dockSide="left";
   const seg=(cls,items,cur)=>`<div class="langpick ${cls}" role="group">${items.map(([v,l])=>`<button data-v="${v}" class="${cur===v?"on":""}" aria-pressed="${cur===v}">${l}</button>`).join("")}</div>`;
   overlay(`<h2>${tr("Settings","ตั้งค่า")}</h2>
@@ -1286,26 +1356,85 @@ function showSettings(){dockSide="left";
 /* ---------- first-play coach: points at the board until the player has tapped ✕ and tried a double-tap ---------- */
 /* ---------- practice pop-up: a separate try-it board (manual tutorial) ---------- */
 let PR=null;
-function showPractice(){dockSide="left";
-  const p=generateN(5,rng(20261107)),n=5;
-  PR={p,n,m:new Array(n*n).fill(0),step:1,placed:0,target:-1,drag:null,last:{k:-1,t:0},glow:[],help:-1,hist:[]};
-  overlay(`<div class="prhead"><h2>🎓 ${tr("Practice","ทดลองเล่น")}</h2><button class="prx" id="prClose" aria-label="Close">✕</button></div>
-    <div class="prdots" id="prDots"></div><div class="prmsg" id="prMsg"></div>
-    <div class="board prboard" id="prBoard"></div><div class="prnote" id="prNote"></div>
-    <div class="prbtns"><button class="big alt" id="prHelp" hidden>💡 ${tr("Show me one","ช่วยชี้ 1 ช่อง")}</button>
-    <button class="big alt" id="prSkip">${tr("Skip practice","ข้ามการทดลอง")}</button></div>`);
-  $("ovCard").classList.add("practice");
-  const b=$("prBoard"),pc=pxE(curTheme().pieces[0]),fs=Math.floor(296/n*0.62);b.style.gridTemplateColumns=`repeat(${n},1fr)`;
+/* logic tricks: each lesson loads a real board, plays the game's own hint engine up to a step of that kind, and asks the player to find it */
+const TRICKS=[
+ {id:"single",n:5,ic:"🎯",en:"Last spot",th:"ช่องสุดท้าย",
+  rule:["An area, row or column with just one open cell left: its piece has to go there.","โซน แถว หรือคอลัมน์ที่เหลือช่องว่างช่องเดียว ตัวต้องวางตรงนั้น"],
+  task:["Double-tap the spot where a piece must go.","แตะ 2 ครั้งที่ช่องซึ่งต้องวางตัว"],test:st=>st.kind==="place"&&st.vis.t==="single"},
+ {id:"line",n:6,ic:"🧱",en:"Line-up",th:"อยู่แนวเดียว",
+  rule:["If all the open cells of one colour sit in one row or column, that colour's piece is in that line. Every other cell of the line gets ✕.","ถ้าช่องว่างทั้งหมดของสีหนึ่งอยู่แถวหรือคอลัมน์เดียว ตัวของสีนั้นต้องอยู่ในแนวนั้น ช่องอื่นในแนวนั้นจึงได้ ✕"],
+  task:["Tap a cell that can't hold a piece to ✕ it.","แตะช่องที่วางตัวไม่ได้เพื่อใส่ ✕"],test:st=>st.vis.t==="confine"&&st.vis.src.length===1},
+ {id:"group",n:7,ic:"👯",en:"Pairs & trios",th:"จับกลุ่ม",
+  rule:["Two (or three) colours that only fit inside the same two (or three) lines use up all the pieces there. Everything else in those lines gets ✕.","ถ้า 2 (หรือ 3) สีมีที่ว่างอยู่แค่ใน 2 (หรือ 3) แถวหรือคอลัมน์เดียวกัน ตัวจะถูกใช้หมดในนั้น ช่องอื่นในแนวเหล่านั้นจึงได้ ✕"],
+  task:["Tap a cell that can't hold a piece to ✕ it.","แตะช่องที่วางตัวไม่ได้เพื่อใส่ ✕"],test:st=>st.vis.t==="confine"&&st.vis.src.length>=2},
+ {id:"block",n:6,ic:"🚧",en:"Blocker",th:"ตัวขวาง",
+  rule:["If a piece here would leave a colour, row or column with no open cell, this cell can't hold a piece.","ถ้าวางตัวตรงนี้แล้วทำให้สี แถว หรือคอลัมน์ใดไม่เหลือช่องว่าง ช่องนี้ก็วางไม่ได้"],
+  task:["Find a cell that would block a whole area, and ✕ it.","หาช่องที่ถ้าวางจะบล็อกทั้งโซน แล้วใส่ ✕"],test:st=>st.vis.t==="block"},
+ {id:"force",n:7,ic:"🔮",en:"What-if",th:"ลองสมมติ",
+  rule:["Pretend a piece is here and follow the forced moves. If some area ends with no room, the pretend was wrong: ✕.","สมมติว่าวางตัวตรงนี้ แล้วไล่ตามที่ถูกบังคับ ถ้าจบด้วยโซนไม่เหลือที่ แปลว่าสมมติผิด ใส่ ✕"],
+  task:["Find the cell that fails the what-if, and ✕ it.","หาช่องที่สมมติแล้วล้มเหลว แล้วใส่ ✕"],test:st=>st.vis.t==="force"}];
+function withP(p,fn){const sv=P;P=p;try{return fn()}finally{P=sv}}
+function prBuild(n,p){const b=$("prBoard"),pc=pxE(curTheme().pieces[0]),fs=Math.floor(296/n*0.62);b.innerHTML="";b.classList.remove("focus");b.style.gridTemplateColumns=`repeat(${n},1fr)`;
   for(let k=0;k<n*n;k++){const d=document.createElement("div");d.className="cell";d.dataset.k=k;d.innerHTML=XSVG+`<span class="a" style="font-size:${fs}px">${pc}</span>`;
-    const col=palNow[p.reg[k]%palNow.length];d.style.background=col;d.style.setProperty("--cellx",xColorFor(col));b.appendChild(d)}
+    const col=palNow[p.reg[k]%palNow.length];d.style.background=col;d.style.setProperty("--cellx",xColorFor(col));b.appendChild(d)}}
+function prTrickFind(ti,seed){const T=TRICKS[ti],n=T.n;
+  for(let i=0;i<150;i++){const p=generateN(n,rng(77000+ti*1000+seed*131+i));p.n=n;p.animal=curTheme().pieces[0];
+    const r=withP(p,()=>{const G=buildGroups(),M={cand:new Array(n*n).fill(true),placed:new Array(n*n).fill(false)},m=new Array(n*n).fill(0);
+      for(let g=0;g<300;g++){const st=nextRule(M,G);if(!st)return null;
+        if(T.test(st)&&(st.kind==="place"||st.targets.length))return{m,st};
+        if(st.kind==="place"){mPlace(M,st.cell);m[st.cell]=2;for(let q=0;q<n*n;q++)if(m[q]!==2&&sees(st.cell,q))m[q]=1}
+        else st.targets.forEach(k=>{M.cand[k]=false;m[k]=1})}
+      return null});
+    if(r)return{p,n,m:r.m,step:r.st}}
+  return null}
+function prTrickLoad(bump){if(!PR||!PR.tr)return;if(bump)PR.tr.seed++;const f=prTrickFind(PR.tr.i,PR.tr.seed);
+  if(!f){$("prMsg").innerHTML=`<span class="pri">🤔</span><div><b>${tr("No board found","หาด่านไม่เจอ")}</b><small>${tr("Tap New board to try again.","กด ด่านใหม่ เพื่อลองอีกครั้ง")}</small></div>`;return}
+  PR.p=f.p;PR.n=f.n;PR.m=f.m;PR.stp=f.step;PR.done=false;PR.reveal=false;PR.last={k:-1,t:0};prBuild(f.n,f.p);prTrickRender()}
+function prNope(k,t){const el=$("prBoard").children[k];el.classList.add("nope");setTimeout(()=>el.classList.remove("nope"),460);prNote("🙂 "+t)}
+function prTrickTap(k){if(!PR||!PR.tr||PR.done||!PR.stp)return;const{m,stp,p}=PR;if(m[k]!==0)return;
+  if(stp.kind==="elim"){
+    if(stp.targets.includes(k)){stp.targets.forEach(q=>m[q]=1);PR.done=true;prTrickRender()}
+    else prNope(k,tr("Not that one. Look at the glowing area, or tap 💡.","ไม่ใช่ช่องนี้ ดูโซนที่เรืองแสง หรือกด 💡"))}
+  else{
+    if(k!==stp.cell){prNope(k,tr("Not that spot.","ไม่ใช่ช่องนี้"));PR.last={k:-1,t:0};return}
+    const now=performance.now();
+    if(PR.last.k===k&&now-PR.last.t<350){m[k]=2;withP(p,()=>{for(let q=0;q<m.length;q++)if(m[q]!==2&&sees(k,q))m[q]=1});PR.done=true;prTrickRender()}
+    else{PR.last={k,t:now};prNote("👍 "+tr("Right spot! Now double-tap to place it.","ถูกช่องแล้ว! แตะ 2 ครั้งเพื่อวางตัว"))}}}
+function prTrickRender(){if(!PR||!PR.tr||!$("prBoard")||!PR.stp)return;const{m,stp,done,reveal}=PR,T=TRICKS[PR.tr.i],cells=$("prBoard").children;
+  const hintG=reveal||done||["single","line","group"].includes(T.id);let any=false;
+  [...cells].forEach((c,k)=>{c.classList.toggle("x",m[k]===1);c.classList.toggle("animal",m[k]===2);
+    const inG=hintG&&stp.groups.some(g=>g.cells&&g.cells.includes(k)),isT=(done||reveal)&&(stp.kind==="place"?k===stp.cell:stp.targets.includes(k));
+    c.classList.toggle("grp",!!(inG||isT));c.classList.toggle("tgt",!!isT);if(inG||isT)any=true});
+  $("prBoard").classList.toggle("focus",any);
+  $("prMsg").innerHTML=`<span class="pri">${emo(T.ic)}</span><div><b>${tr(T.en,T.th)}</b><small>${tr(T.rule[0],T.rule[1])}</small></div>`;
+  $("prVis").innerHTML=done?emo(withP(PR.p,()=>visHTML(stp))):"";
+  prNote(done?"✅ "+stp.text:"👆 "+tr(T.task[0],T.task[1]));
+  $("prHelp").hidden=done;$("prNext").textContent=(done?"➜ ":"🔄 ")+(done?tr("Next board","ด่านถัดไป"):tr("New board","ด่านใหม่"));
+  $("trPick").querySelectorAll("button").forEach((b,i)=>b.classList.toggle("on",i===PR.tr.i))}
+function showPractice(tab,ti){dockSide="left";const tk=tab==="tricks";
+  const p=generateN(5,rng(20261107)),n=5;
+  PR=tk?{tr:{i:ti||0,seed:0},drag:null,last:{k:-1,t:0},m:[],step:0}:{p,n,m:new Array(n*n).fill(0),step:1,placed:0,target:-1,drag:null,last:{k:-1,t:0},glow:[],help:-1,hist:[]};
+  overlay(`<div class="prhead"><h2>🎓 ${tr("Practice","ทดลองเล่น")}</h2><button class="prx" id="prClose" aria-label="Close">✕</button></div>
+    <div class="langpick prtabs" role="group"><button data-t="moves" class="${tk?"":"on"}">${tr("Moves","วิธีเล่น")}</button><button data-t="tricks" class="${tk?"on":""}">🧠 ${tr("Tricks","เทคนิค")}</button></div>
+    ${tk?`<div class="trpick" id="trPick">${TRICKS.map((t,i)=>`<button data-i="${i}">${tr(t.en,t.th)}</button>`).join("")}</div>`:'<div class="prdots" id="prDots"></div>'}
+    <div class="prmsg" id="prMsg"></div>
+    <div class="board prboard" id="prBoard"></div>${tk?'<div class="prvis vis" id="prVis"></div>':""}<div class="prnote" id="prNote"></div>
+    <div class="prbtns"><button class="big alt" id="prHelp" hidden>💡 ${tr("Show me","ช่วยชี้")}</button>
+    ${tk?`<button class="big alt" id="prNext">🔄 ${tr("New board","ด่านใหม่")}</button>`:""}
+    <button class="big alt" id="prSkip">${tk?tr("Close","ปิด"):tr("Skip practice","ข้ามการทดลอง")}</button></div>`);
+  $("ovCard").classList.add("practice");
+  $("ovCard").querySelectorAll(".prtabs button").forEach(x=>x.onclick=()=>{if(!x.classList.contains("on"))showPractice(x.dataset.t)});
+  if(tk){$("trPick").querySelectorAll("button").forEach(x=>x.onclick=()=>{PR.tr.i=+x.dataset.i;PR.tr.seed=0;prTrickLoad()});$("prNext").onclick=()=>prTrickLoad(true)}
+  else prBuild(n,p);
+  const b=$("prBoard");
   $("prClose").onclick=$("prSkip").onclick=()=>{PR=null;closeOv()};
-  $("prHelp").onclick=()=>{if(!PR)return;PR.help=prNextSol();prRender()};
+  $("prHelp").onclick=()=>{if(!PR)return;if(PR.tr){PR.reveal=true;prTrickRender();return}PR.help=prNextSol();prRender()};
   const kAt=e=>{const el=document.elementFromPoint(e.clientX,e.clientY);const c=el&&el.closest&&el.closest("#prBoard .cell");return c?+c.dataset.k:-1};
-  b.addEventListener("pointerdown",e=>{if(!PR)return;const k=kAt(e);if(k<0)return;const m=PR.m[k];
+  b.addEventListener("pointerdown",e=>{if(!PR)return;const k=kAt(e);if(k<0)return;if(PR.tr){PR.drag={start:k};return}const m=PR.m[k];
     PR.drag={start:k,moved:false,paint:m===0?1:m===1?0:null,touched:new Set([k]),count:0};b.setPointerCapture?.(e.pointerId)});
-  b.addEventListener("pointermove",e=>{const D=PR&&PR.drag;if(!D||D.paint===null||PR.step<4)return;const k=kAt(e);if(k<0||D.touched.has(k))return;
+  b.addEventListener("pointermove",e=>{const D=PR&&PR.drag;if(!D||PR.tr||D.paint===null||PR.step<4)return;const k=kAt(e);if(k<0||D.touched.has(k))return;
     if(!D.moved){D.moved=true;if(prSet(D.start,D.paint))D.count++}D.touched.add(k);if(prSet(k,D.paint))D.count++;prRender()});
-  b.addEventListener("pointerup",()=>{if(!PR||!PR.drag)return;const D=PR.drag;PR.drag=null;
+  b.addEventListener("pointerup",()=>{if(!PR||!PR.drag)return;const D=PR.drag;PR.drag=null;if(PR.tr){prTrickTap(D.start);return}
     if(D.moved){if(PR.step===4&&D.count>=2){PR.step=5;prNote("✅ "+tr("Nice!","เยี่ยม!"))}prRender();return}
     const k=D.start;if(PR.m[k]===2||(PR.m[k]===1&&prLocked(k)))return;const now=performance.now();
     if(PR.last.k===k&&now-PR.last.t<350){PR.m[k]=PR.last.prev;PR.last={k:-1,t:0};prPlace(k)}
@@ -1315,7 +1444,7 @@ function showPractice(){dockSide="left";
         else if(PR.step===2&&k===PR.target&&PR.m[k]===0){PR.step=3;prNote("✅ "+tr("Gone!","ลบแล้ว!"))}
         prRender()},380)}});
   b.addEventListener("contextmenu",e=>e.preventDefault());
-  prRender()}
+  if(tk)prTrickLoad();else prRender()}
 function prSees(a,q){const{n,p}=PR,ay=a/n|0,ax=a%n,qy=q/n|0,qx=q%n;return a!==q&&(ay===qy||ax===qx||p.reg[a]===p.reg[q]||(Math.abs(ay-qy)<=1&&Math.abs(ax-qx)<=1))}
 function prLocked(k){return PR.m.some((v,q)=>v===2&&prSees(q,k))}
 function prSet(k,v){if(PR.m[k]===2||PR.m[k]===v||(v===0&&prLocked(k)))return false;PR.m[k]=v;return true}
@@ -1372,6 +1501,11 @@ function coachPlaced(){if(!coachStep)return;coachStep=0;store.set("coached",true
    Bumping one number resets the ones to its right (1.3.4 -> 1.4.0). Tag the commit too: git tag v1.4.0
    History: v2..v18 (Claude artifact era) became 0.2.0..0.18.0, and v19 (own website) became 1.0.0. ---------- */
 const CHANGELOG=[
+ {v:"1.2.0",date:"2026-11-12",items:[
+  ["👤","New Profile in the ☰ menu: set your name once, and the leaderboard and Daily use it. The name box is gone from the leaderboard.","มีโปรไฟล์ในเมนู ☰ ตั้งชื่อที่เดียว กระดานอันดับและรายวันใช้ชื่อนี้ ช่องตั้งชื่อในกระดานอันดับถูกเอาออกแล้ว"],
+  ["✏️","Draft mode: tap ✏️ under the board to try ideas in pencil. It doesn't touch your hearts, hints or save. Use Put on board to make it real, or Clear draft.","โหมดร่าง: กด ✏️ ใต้กระดานเพื่อลองคิดด้วยดินสอ ไม่กระทบหัวใจ คำใบ้ หรือเซฟ กด ลงกระดานจริง เพื่อใช้ หรือ ล้างร่าง"],
+  ["🧠","Practice board has a new Tricks tab: five logic rules (last spot, line-up, pairs & trios, blocker, what-if) to find and try on real boards.","ทดลองเล่นมีแท็บเทคนิคใหม่: กฎตรรกะ 5 แบบ (ช่องสุดท้าย อยู่แนวเดียว จับกลุ่ม ตัวขวาง ลองสมมติ) ให้ลองหาบนกระดานจริง"],
+  ["🧹","The old transfer code is gone: everyone has moved over.","เอาโค้ดย้ายคะแนนเวอร์ชันเก่าออกแล้ว เพราะย้ายครบแล้ว"]]},
  {v:"1.1.3",date:"2026-11-10",items:[
   ["↻","Restart now asks first, and warns you when restarting would reset your win streak.","ปุ่มเริ่มใหม่จะถามก่อน และเตือนถ้าการเริ่มใหม่จะทำให้สถิติชนะติดกันหาย"],
   ["⚠️","Start over in Settings asks twice before taking you back to Level 1.","เริ่มใหม่ทั้งหมดในหน้าตั้งค่าจะถามสองครั้งก่อนกลับไปเลเวล 1"]]},
@@ -1391,7 +1525,6 @@ const CHANGELOG=[
  {v:"1.0.0",date:"2026-11-09",items:[
   ["🏠","Off My Tiles! has its own website now. No Claude account needed: just open the link and play.","Off My Tiles! มีเว็บของตัวเองแล้ว ไม่ต้องมีบัญชี Claude แค่เปิดลิงก์ก็เล่นได้เลย"],
   ["🔑","Sign in with Google in Settings to keep your save on any phone or computer.","ล็อกอินด้วย Google ในหน้าตั้งค่า เพื่อเล่นต่อได้ทุกเครื่อง"],
-  ["📦","Played the old version? Sign in, then enter your transfer code in Settings to bring your level and stars over.","เคยเล่นเวอร์ชันเก่า? ล็อกอินแล้วใส่โค้ดย้ายคะแนนในหน้าตั้งค่า เพื่อย้ายเลเวลและดาวมา"],
   ["❤️","Refreshing the page keeps your board and hearts, so it no longer refills lost hearts.","รีเฟรชหน้าแล้วกระดานกับหัวใจยังอยู่เหมือนเดิม รีเฟรชไม่ได้หัวใจคืนแล้ว"],
   ["🛡️","Fair play: the server now rejects impossible scores, like skipping levels or a too-fast Daily time.","เล่นแฟร์: เซิร์ฟเวอร์ไม่รับคะแนนที่เป็นไปไม่ได้ เช่น ข้ามเลเวล หรือเวลา Daily ที่เร็วเกินจริง"],
   ["👆","Double-tapping no longer zooms the page on phones.","แตะสองครั้งบนมือถือ หน้าจอไม่ซูมแล้ว"]]},
@@ -1656,7 +1789,7 @@ $("festBar").onclick=()=>{if(mode!=="main")exitFest();else enterFest()};
 function renderGest(){if(!(mode==="main"&&level===1)){$("helpText").innerHTML="";return}const pc=pxE(P?P.animal:"🦊");$("helpText").innerHTML=emo(`<span>👆 ${tr("Tap","แตะ")} = ${ic("xred")}</span><span>👆👆 ${tr("Double-tap","แตะ 2 ครั้ง")} = ${pc}</span><span>👉 ${tr("Drag","ลาก")} = ${ic("xred")}${ic("xred")}</span>`+(mode==="main"?`<button class="tut" id="tutChip">🎓 ${tr("Tutorial","สอนเล่น")}</button>`:""));const tc=$("tutChip");if(tc)tc.onclick=showPractice;balance($("helpText"))}
 function applyLang(){document.documentElement.lang=lang;if(fitted)setTimeout(fit,60);
   $("tlUndo").textContent=tr("Undo","ย้อน");$("tlCross").textContent=tr("Cross","กากบาท");$("tlPlace").textContent=tr("Place","วาง");
-  $("tlClear").textContent=tr("Clear","ล้าง");$("tlAuto").textContent=tr("Auto","อัตโนมัติ");
+  $("tlClear").textContent=tr("Clear","ล้าง");$("tlDraft").textContent=tr("Draft","ร่าง");renderDraft();$("tlAuto").textContent=tr("Auto","อัตโนมัติ");
   $("loading").textContent=tr("Building puzzle…","กำลังสร้างด่าน…");$("hintOk").textContent=tr("Got it","เข้าใจแล้ว");
   renderGest();
   renderStack();renderTitle();renderFestBar()}
