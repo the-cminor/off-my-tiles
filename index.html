@@ -688,6 +688,8 @@ const sizeBase=(n,L)=>100+25*(n-5)+2*L; // board-size pay + 2 per level
    Keep in step with public.omt_max_gain in Supabase (it adds the same +2 per level), which caps stars per level. */
 function isMilestone(L){if(L<100)return false;if(L<=200)return L%50===0;if(L<=300)return L%25===0;if(L<=390)return(L-300)%15===0;if(L<=500)return L%10===0;return L%5===0}
 const milestoneBonus=L=>isMilestone(L)?10*L:0;
+/* win-streak milestones: streak 100, 150, 200 … pays 20 × the streak (no multiplier). Keep in step with omt_max_gain. */
+const streakMilestone=s=>s>=100&&s%50===0?20*s:0;
 
 /* ---------- storage (best effort) ---------- */
 const store={get(k,d){try{const v=localStorage.getItem("zoo_"+k);return v==null?d:JSON.parse(v)}catch(e){return d}},
@@ -1242,7 +1244,7 @@ let boardNoteLock=false;
 $("boardBtn").onclick=()=>showBoard("goat");
 function win(){if(mode==="fest"){festWin();return}if(mode==="daily"){dailyWin();return}clearTimeout(runT);store.set("run",null);
   const lv=level,base=sizeBase(P.n,lv),perfect=mistakes===0&&!usedHint,mult=TIERS[tierIdx()],gain=Math.floor(base*(perfect?1.5:1))*mult,bonus=milestoneBonus(lv);
-  score+=gain+bonus;streak++;level++;best=Math.max(best,streak);store.set("best",best);
+  streak++;const sBonus=streakMilestone(streak);score+=gain+bonus+sBonus;level++;best=Math.max(best,streak);store.set("best",best);
   const gotA=streak%3===0;
   hX=Math.min(hX+2,99);if(gotA)hA=Math.min(hA+1,99);saveHints();
   const newTheme=THEMES.find(t=>!isEvent(t)&&t.at>1&&t.at===level-1);
@@ -1255,6 +1257,7 @@ function win(){if(mode==="fest"){festWin();return}if(mode==="daily"){dailyWin();
   noX=true;overlay(`<div class="big-emoji">${pxE(P.animal)}🎉</div><h2>${word}</h2>
     <p>${perfect?tr("No mistakes, no hints. Perfect clear!","ไม่ผิดเลย ไม่ใช้คำใบ้ ผ่านแบบเพอร์เฟกต์!"):mistakes===0?tr("No mistakes, but a hint was used, so no perfect bonus.","ไม่ผิดเลย แต่ใช้คำใบ้ จึงไม่ได้โบนัสเพอร์เฟกต์"):tr(`Level cleared with ${mistakes} mistake${mistakes>1?"s":""}.`,`ผ่านด่านโดยผิด ${mistakes} ครั้ง`)}</p>${rewards}
     <div class="gain">⭐ ${base}${perfect?tr(" × 1.5 perfect"," × 1.5 เพอร์เฟกต์"):""} × X${mult} = +${gain.toLocaleString()}</div>
+    ${sBonus?`<div class="gain">🔥 ${tr(`${streak} wins in a row`,`ชนะติดกัน ${streak} ครั้ง`)} +${sBonus.toLocaleString()}</div>`:""}
     ${bonus?`<div class="gain">🏁 ${tr(`Level ${lv} milestone`,`เลเวล ${lv} ด่านพิเศษ`)} +${bonus.toLocaleString()}</div>`:""}
     <div class="streakline">${tr(`🔥 ${streak} wins in a row · next level pays X${TIERS[tierIdx()]}`,`🔥 ชนะติดกัน ${streak} · ด่านต่อไปได้ X${TIERS[tierIdx()]}`)}</div>
     <button class="big" id="nextBtn">${tr("Level","เลเวล")} ${level}</button>`);
@@ -1309,6 +1312,7 @@ function showHelp(){dockSide="left";const pc=pxE(P?P.animal:"🦊");
       ${more("💡",tr("Hints:","คำใบ้:"),tr(`❌ crosses out one cell (+2 per level). ${pc} places one piece (+1 every 3 wins in a row).`,`❌ ตัดช่องให้ 1 ช่อง (+2 ทุกด่าน) ${pc} วางให้ 1 ตัว (+1 ทุกชนะติดกัน 3 ครั้ง)`))}
       ${more("⭐",tr("Stars:","ดาว:"),tr("Bigger boards and higher levels pay more (100 on 5×5 up to 250 on 11×11, plus 2 per level). A perfect clear (no mistakes, no hints) pays +50%.","กระดานใหญ่และเลเวลสูงได้ดาวมากขึ้น (5×5 ได้ 100 ถึง 11×11 ได้ 250 บวกเพิ่มเลเวลละ 2) ผ่านแบบเพอร์เฟกต์ (ไม่ผิด ไม่ใช้คำใบ้) ได้เพิ่ม 50%"))}
       ${more("🔥",tr("Streak:","ชนะติดกัน:"),tr("Win in a row to raise X1 → X10 ⭐ stars. Running out of hearts, or restarting after a mistake, resets it.","ชนะติดกันเพื่อเพิ่มตัวคูณ X1 → X10 ⭐ ถ้าหัวใจหมด หรือกดเริ่มใหม่หลังวางผิด จะกลับไปเริ่มที่ X1"))}
+      ${more("🔥",tr("Streak milestones:","ด่านพิเศษชนะติดกัน:"),tr("Win 100 in a row, then every 50 more (150, 200…) for a bonus of 20 × your streak.","ชนะติดกัน 100 ครั้ง แล้วทุก 50 ครั้ง (150, 200…) ได้โบนัส 20 × จำนวนชนะติดกัน"))}
       ${more("🏁",tr("Milestones:","ด่านพิเศษ:"),tr("From Level 100, milestone levels pay a bonus of 10 × the level. They come more often the higher you go.","ตั้งแต่เลเวล 100 ด่านพิเศษได้โบนัส 10 × เลเวล และจะมาถี่ขึ้นเมื่อเลเวลสูงขึ้น"))}
       ${more("🎨",tr("Themes:","ธีม:"),tr("Clear levels 10, 20, 30… to unlock new pieces and colours.","ผ่านเลเวล 10, 20, 30… เพื่อปลดล็อกตัวหมากและสีใหม่"))}
       ${more("📅",tr("Daily:","รายวัน:"),tr("Same timed 9×9 for everyone. +30 s per mistake.","ด่าน 9×9 เดียวกันทุกคน จับเวลา วางผิด +30 วิ"))}
@@ -1594,6 +1598,8 @@ function coachPlaced(){if(!coachStep)return;coachStep=0;store.set("coached",true
    Bumping one number resets the ones to its right (1.3.4 -> 1.4.0). Tag the commit too: git tag v1.4.0
    History: v2..v18 (Claude artifact era) became 0.2.0..0.18.0, and v19 (own website) became 1.0.0. ---------- */
 const CHANGELOG=[
+ {v:"1.8.0",date:"2026-11-13",items:[
+  ["🔥","Win-streak milestones: at 100 wins in a row, then every 50 more, you get a bonus of 20 × your streak.","ด่านพิเศษชนะติดกัน: เมื่อชนะติดกัน 100 ครั้ง และทุก 50 ครั้งถัดไป ได้โบนัส 20 × จำนวนชนะติดกัน"]]},
  {v:"1.7.0",date:"2026-11-13",items:[
   ["⭐","Base stars now grow with your level too: board-size pay plus 2 for every level.","ดาวพื้นฐานเพิ่มตามเลเวลด้วย: ดาวตามขนาดกระดาน บวกเพิ่มเลเวลละ 2"]]},
  {v:"1.6.1",date:"2026-11-12",items:[
