@@ -824,7 +824,7 @@ function cellEl(k){return board.children[k]}
 function renderLives(){$("lives").innerHTML=Array.from({length:MAX_LIVES},(_,i)=>`<span class="${i>=lives?"lost":""}">${pxE(curTheme().life)}</span>`).join("")}
 function renderStrip(){const n=P.n;$("strip").innerHTML=Array.from({length:n},(_,i)=>`<span class="slot ${i<placed?"on":""}">${pxE(P.animal)}</span>`).join("")}
 function updateTools(){const f=mode!=="main";$("cxCount").innerHTML=f?ic("lock"):hX;$("anCount").innerHTML=f?ic("lock"):hA;
-  $("crossBtn").disabled=f||hX<=0;$("animalBtn").disabled=f||hA<=0;$("undoBtn").disabled=!history.length}
+  $("crossBtn").disabled=f||hX<=0||draftOn;$("animalBtn").disabled=f||hA<=0||draftOn;$("undoBtn").disabled=!history.length||draftOn}
 function setMark(k,v,record=true){if(marks[k]===v)return;if(record)history.push([k,marks[k]]);marks[k]=v;const e=cellEl(k);e.classList.toggle("x",v===1);e.classList.toggle("animal",v===2);if(mode==="main"&&!restoring)queueRun()}
 /* current attempt (board, hearts, mistakes) survives a page refresh, so refreshing can't refill hearts */
 let runT=null,restoring=false;
@@ -870,7 +870,7 @@ function locked(k){if(!P)return false;const n=P.n,y=k/n|0,x=k%n;
 /* ---------- ✏️ draft mode: try ideas on a pencil layer. Nothing here touches hearts, hints, stars or the saved game ---------- */
 function dSees(a,b){return sees(a,b)}
 function renderDraft(){const b=$("draftBtn");if(!b)return;b.classList.toggle("on",draftOn);b.setAttribute("aria-pressed",String(draftOn));
-  const bar=$("draftBar");bar.hidden=!draftOn;$("helpText").hidden=draftOn||(!!$("hintSheet")&&!$("hintSheet").hidden);
+  const bar=$("draftBar");bar.hidden=!draftOn;if(typeof updateTools==="function"&&P)updateTools();$("helpText").hidden=draftOn||(!!$("hintSheet")&&!$("hintSheet").hidden);
   if(!P||!draft.length)return;const n=P.n,pcs=[],pc=pxE(P.animal);draft.forEach((v,k)=>{if(v===2)pcs.push(k)});
   const nPieces=pcs.length,any=draft.some(v=>v);
   [...board.children].forEach((c,k)=>{const dr=c.querySelector(".dr");if(!dr)return;
@@ -929,7 +929,7 @@ board.addEventListener("dblclick",e=>e.preventDefault());
 board.addEventListener("contextmenu",e=>e.preventDefault());
 
 /* ---------- tools ---------- */
-$("undoBtn").onclick=()=>{const h=history.pop();if(h){setMark(h[0],h[1],false)}updateTools()};
+$("undoBtn").onclick=()=>{if(draftOn)return;const h=history.pop();if(h){setMark(h[0],h[1],false)}updateTools()};
 $("clearBtn").onclick=()=>{if(!P)return;for(let k=0;k<P.n*P.n;k++)if(marks[k]===1)setMark(k,0);
   // re-apply auto ✕ from placed animals
   for(let k=0;k<P.n*P.n;k++)if(marks[k]===2)autoX(k);history=[];updateTools()};
@@ -1061,9 +1061,9 @@ function lockPage(){const open=!$("hintSheet").hidden&&sheetBelow,r=document.doc
   else{if(scrollY)scrollTo(0,0);r.classList.add("lock")}}
 let sheetBelow=false,sheetScrollT=null,fitW=0,fitH=0,sheetSide=false;
 const canHint=()=>mode==="main"&&!busy&&lives>0&&placed<P.n;
-$("crossBtn").onclick=()=>{if(hX<=0||!canHint())return;clearFocus();const s=crossHint();if(!s)return;
+$("crossBtn").onclick=()=>{if(draftOn||hX<=0||!canHint())return;clearFocus();const s=crossHint();if(!s)return;
   hX--;saveHints();usedHint=true;if(mode==="main")queueRun();s.newT.forEach(k=>setMark(k,1,false));history=history.filter(([q])=>!s.newT.includes(q));updateTools();showHint(s);checkAutoFill()};
-$("animalBtn").onclick=()=>{if(hA<=0||!canHint())return;clearFocus();const s=animalHint();
+$("animalBtn").onclick=()=>{if(draftOn||hA<=0||!canHint())return;clearFocus();const s=animalHint();
   hA--;saveHints();usedHint=true;if(mode==="main")queueRun();placeAnimal(s.cell,true);updateTools();showHint(s)};
 function doRestart(){if(mode==="main"&&mistakes>0)resetStreak();setup();if(mode==="main"){clearTimeout(runT);store.set("run",null);saveCloud()}}
 /* ↻ asks first whenever there is something on the board to lose */
@@ -1598,6 +1598,9 @@ function coachPlaced(){if(!coachStep)return;coachStep=0;store.set("coached",true
    Bumping one number resets the ones to its right (1.3.4 -> 1.4.0). Tag the commit too: git tag v1.4.0
    History: v2..v18 (Claude artifact era) became 0.2.0..0.18.0, and v19 (own website) became 1.0.0. ---------- */
 const CHANGELOG=[
+ {v:"1.8.1",date:"2026-11-15",items:[
+  ["✏️","Fix: while Draft is on, the hint buttons and Undo are now off, so no hint pop-up can cover your draft or change the real board.","แก้บั๊ก: ตอนเปิดโหมดร่าง ปุ่มคำใบ้และย้อนกลับจะปิดไว้ ป๊อปอัปคำใบ้จะไม่มาบังหรือเปลี่ยนกระดานจริง"]
+ ]},
  {v:"1.8.0",date:"2026-11-13",items:[
   ["🔥","Win-streak milestones: at 100 wins in a row, then every 50 more, you get a bonus of 20 × your streak.","ด่านพิเศษชนะติดกัน: เมื่อชนะติดกัน 100 ครั้ง และทุก 50 ครั้งถัดไป ได้โบนัส 20 × จำนวนชนะติดกัน"]]},
  {v:"1.7.0",date:"2026-11-13",items:[
