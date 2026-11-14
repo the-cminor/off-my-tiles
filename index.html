@@ -812,7 +812,7 @@ function startLevel(){
     if(!store.get("coached",false)&&level===1&&mode==="main"&&$("ov").hidden&&!coachStep)setTimeout(startCoach,400)},30);
 }
 function setup(){
-  const n=P.n;marks=new Array(n*n).fill(0);lives=MAX_LIVES;placed=0;combo=0;mistakes=0;history=[];usedHint=false;pickMode=false;autoFilling=false;board.classList.remove("picking");renderStack();draft=new Array(n*n).fill(0);draftOn=false;board.classList.remove("drafting");
+  const n=P.n;marks=new Array(n*n).fill(0);lives=MAX_LIVES;placed=0;combo=0;mistakes=0;history=[];usedHint=false;pickMode=false;autoFilling=false;board.classList.remove("picking");renderStack();draft=new Array(n*n).fill(0);draftOn=false;board.classList.remove("drafting");if($("draftBar"))$("draftBar").hidden=true;
   renderTitle();
   board.style.gridTemplateColumns=`repeat(${n},1fr)`;board.innerHTML="";$("hintSheet").hidden=true;$("helpText").hidden=false;board.classList.remove("focus");
   const fs=Math.floor(Math.min(board.clientWidth||400,460)/n*0.62);
@@ -1599,6 +1599,7 @@ function coachPlaced(){if(!coachStep)return;coachStep=0;store.set("coached",true
    History: v2..v18 (Claude artifact era) became 0.2.0..0.18.0, and v19 (own website) became 1.0.0. ---------- */
 const CHANGELOG=[
  {v:"1.8.1",date:"2026-11-15",items:[
+  ["✏️","Fix: the Draft bar (Put on board / Clear draft) no longer stays on screen after a win or a new board.","แก้บั๊ก: แถบโหมดร่าง (ลงกระดานจริง / ล้างร่าง) ไม่ค้างอยู่บนจอหลังชนะหรือเริ่มกระดานใหม่"],
   ["✏️","Fix: while Draft is on, the hint buttons and Undo are now off, so no hint pop-up can cover your draft or change the real board.","แก้บั๊ก: ตอนเปิดโหมดร่าง ปุ่มคำใบ้และย้อนกลับจะปิดไว้ ป๊อปอัปคำใบ้จะไม่มาบังหรือเปลี่ยนกระดานจริง"]
  ]},
  {v:"1.8.0",date:"2026-11-13",items:[
