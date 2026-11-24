@@ -718,9 +718,19 @@ function grow(n,p,r){const reg=new Array(n*n).fill(-1),size=new Array(n).fill(1)
   while(left>0){const front=[];for(let k=0;k<n*n;k++){if(reg[k]!==-1)continue;const y=k/n|0,x=k%n;for(const[dy,dx]of D4){const yy=y+dy,xx=x+dx;if(yy<0||xx<0||yy>=n||xx>=n)continue;const g=reg[yy*n+xx];if(g>=0)front.push([k,g])}}
     let tot=0;const w=front.map(([,g])=>{const v=(0.3+r())/Math.pow(size[g],0.6);tot+=v;return v});let x=r()*tot,i=0;while(i<w.length-1&&x>w[i]){x-=w[i];i++}
     const[k,g]=front[i];reg[k]=g;size[g]++;left--}return reg}
-function findAlt(n,reg,sol){const col=new Array(n).fill(false),rg=new Array(n).fill(false),p=[];let res=null;
-  (function bt(row){if(res)return;if(row===n){if(p.some((c,i)=>c!==sol[i]))res=p.slice();return}
-    for(let c=0;c<n;c++){if(col[c])continue;const g=reg[row*n+c];if(rg[g]||(row>0&&Math.abs(p[row-1]-c)<=1))continue;col[c]=rg[g]=true;p[row]=c;bt(row+1);col[c]=rg[g]=false;if(res)return}})(0);return res}
+/* findAlt: first other solution in row-by-row, left-to-right order (or null). Same order and result as a plain backtrack,
+   but fast on 11×11 boards: bitmasks, it remembers dead ends (a state with no way to finish is dead whatever came before it),
+   and it stops early when an unused colour or column has no free cell left in the rows below. */
+function findAlt(n,reg,sol){const rs=[],cs=[];for(let y=0;y<=n;y++){rs.push(new Array(n).fill(0));cs.push(new Array(n).fill(0))}
+  for(let y=n-1;y>=0;y--){for(let i=0;i<n;i++){rs[y][i]=rs[y+1][i];cs[y][i]=cs[y+1][i]}for(let x=0;x<n;x++){const g=reg[y*n+x];rs[y][g]|=1<<x;cs[y][x]|=1<<g}}
+  const p=[],dead=new Set();let res=null;
+  function ok(row,cm,gm){const R=rs[row],C=cs[row];for(let i=0;i<n;i++){if(!(gm>>i&1)&&!(R[i]&~cm))return false;if(!(cm>>i&1)&&!(C[i]&~gm))return false}return true}
+  (function bt(row,cm,gm,last,diff){if(row===n){if(diff)res=p.slice();return true}
+    const key=(cm*2048+gm)*16+last;if(dead.has(key))return false;let any=false;
+    for(let c=0;c<n;c++){if(cm>>c&1)continue;const g=reg[row*n+c];if(gm>>g&1||(row>0&&Math.abs(last-c)<=1))continue;
+      const cm2=cm|1<<c,gm2=gm|1<<g;if(row+1<n&&!ok(row+1,cm2,gm2))continue;p[row]=c;
+      if(bt(row+1,cm2,gm2,c,diff||c!==sol[row]))any=true;if(res)return true}
+    if(!any)dead.add(key);return any})(0,0,0,0,false);return res}
 function connected(n,reg,g,skip){const cells=[];for(let k=0;k<n*n;k++)if(reg[k]===g&&k!==skip)cells.push(k);if(!cells.length)return false;
   const seen=new Set([cells[0]]),st=[cells[0]];while(st.length){const k=st.pop(),y=k/n|0,x=k%n;for(const[dy,dx]of D4){const yy=y+dy,xx=x+dx;if(yy<0||xx<0||yy>=n||xx>=n)continue;const q=yy*n+xx;if(q!==skip&&reg[q]===g&&!seen.has(q)){seen.add(q);st.push(q)}}}return seen.size===cells.length}
 function generate(level){const r=rng(level*7919+13);
@@ -1601,6 +1611,8 @@ function coachPlaced(){if(!coachStep)return;coachStep=0;store.set("coached",true
    Bumping one number resets the ones to its right (1.3.4 -> 1.4.0). Tag the commit too: git tag v1.4.0
    History: v2..v18 (Claude artifact era) became 0.2.0..0.18.0, and v19 (own website) became 1.0.0. ---------- */
 const CHANGELOG=[
+ {v:"1.8.2",date:"2026-11-24",items:[
+  ["⚡","Fix: big 11×11 levels (level 200 and up) now load about 10 times faster, so there is no long wait after clearing a level. The puzzles are exactly the same as before.","แก้บั๊ก: ด่านใหญ่ 11×11 (ด่าน 200 ขึ้นไป) โหลดเร็วขึ้นราว 10 เท่า ไม่ต้องรอนานหลังผ่านด่าน ตัวด่านยังเหมือนเดิมทุกอย่าง"]]},
  {v:"1.8.1",date:"2026-11-15",items:[
   ["✏️","Fix: while Draft is on, Put on board and Clear draft now replace the tool buttons in the same row, so you never have to scroll to reach them.","แก้บั๊ก: ตอนเปิดโหมดร่าง ปุ่มลงกระดานและล้างร่างจะมาแทนปุ่มเครื่องมือในแถวเดียวกัน ไม่ต้องเลื่อนหน้าจอ"],
   ["✏️","Fix: the Draft bar (Put on board / Clear draft) no longer stays on screen after a win or a new board.","แก้บั๊ก: แถบโหมดร่าง (ลงกระดานจริง / ล้างร่าง) ไม่ค้างอยู่บนจอหลังชนะหรือเริ่มกระดานใหม่"],
